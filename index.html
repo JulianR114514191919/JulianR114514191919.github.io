@@ -1,11 +1,471 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-Hant">
 <head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=https://furid.co/julinar06">
-  <script>window.location.href = "https://furid.co/julinar06";</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Julian</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#3A2E22; --muted:#8C7A63; --rust:#B85C34; --moss:#6E7A52;
+    --line: rgba(255,255,255,0.45);
+    --glass: rgba(255,251,242,0.38);
+    --glass-strong: rgba(255,251,242,0.58);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body{ height:100%; overscroll-behavior:none; }
+  body{
+    font-family:'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(circle at 20% 20%, #E8B98A 0%, transparent 45%),
+      radial-gradient(circle at 85% 15%, #C97A55 0%, transparent 40%),
+      radial-gradient(circle at 75% 85%, #8A9668 0%, transparent 45%),
+      radial-gradient(circle at 10% 90%, #D9A05B 0%, transparent 40%),
+      #EFE4D2;
+    background-attachment: fixed;
+  }
+  .blob{ position:fixed; border-radius:50%; filter: blur(70px); opacity:.5; z-index:0; }
+  .blob1{ width:280px; height:280px; background:#C97A55; top:-60px; left:-60px; }
+  .blob2{ width:240px; height:240px; background:#6E7A52; bottom:-40px; right:-40px; }
+
+  .app{ position:relative; height:100dvh; width:100%; overflow:hidden; z-index:1; }
+
+  /* 6 格：p4複製 + p1 + p2 + p3 + p4 + p1複製，做雙向無縫循環 */
+  .track{ display:flex; height:100%; width:600%; transition: transform .55s var(--ease); }
+  .page{ width:16.6667%; height:100%; display:flex; align-items:center; justify-content:center; padding: 28px 20px 90px; }
+
+  .glass{
+    width:100%; max-width:420px; max-height: 100%;
+    background: var(--glass);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid var(--line);
+    border-radius: 30px;
+    padding: 36px 28px;
+    box-shadow: 0 1px 1px rgba(255,255,255,0.4) inset, 0 20px 50px -20px rgba(58,46,34,0.28);
+    overflow-y: auto;
+    animation: rise .6s var(--ease) both;
+  }
+  @keyframes rise{ from{ opacity:0; transform: translateY(14px) scale(.98);} to{ opacity:1; transform: translateY(0) scale(1);} }
+  .glass::-webkit-scrollbar{ display:none; }
+
+  /* 卡牌本身的霧化效果（滑走瞬間），輕量、只作用在卡片上 */
+  @keyframes cardfrost{
+    0%{ filter: blur(0px); }
+    45%{ filter: blur(3.5px); }
+    100%{ filter: blur(0px); }
+  }
+  .glass.frosting{ animation: cardfrost .38s ease; }
+
+  #p1 .glass, #p1clone .glass{ text-align:center; }
+  .avatar{
+    width:92px; height:92px; border-radius:50%; margin:0 auto 20px;
+    background: linear-gradient(135deg, var(--rust), var(--moss));
+    padding:3px; cursor:pointer;
+  }
+  .avatar img{ width:100%; height:100%; border-radius:50%; object-fit:cover; border:3px solid var(--glass-strong); display:block; pointer-events:none; }
+
+  .hello{ font-size:13px; color:var(--muted); font-weight:600; letter-spacing:.04em; }
+
+  .name{
+    font-size:44px; font-weight:800; letter-spacing:-0.02em; margin:4px 0 8px;
+    opacity:0; transform: scale(1.3); filter: blur(8px);
+    animation: fadeZoom 1s var(--ease) forwards;
+  }
+  @keyframes fadeZoom{ to{ opacity:1; transform: scale(1); filter: blur(0); } }
+
+  .sub{ font-size:13.5px; color:var(--muted); margin-bottom:24px; font-weight:500; letter-spacing:.01em; }
+  .tags{ display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:28px; }
+  .tag{ font-size:11.5px; font-weight:600; padding:6px 13px; border-radius:999px; background: var(--glass-strong); border:1px solid var(--line); letter-spacing:.02em; }
+  .tag.accent{ color: var(--rust); }
+
+  .nowplaying{
+    display:flex; align-items:center; gap:12px; text-align:left;
+    background: var(--glass-strong); border:1px solid var(--line);
+    border-radius:18px; padding:12px 14px;
+  }
+  .nowplaying .cover{ width:44px; height:44px; border-radius:11px; background:linear-gradient(135deg,var(--rust),var(--moss)); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .nowplaying .meta{ flex:1; min-width:0; }
+  .nowplaying .meta .t1{ font-size:10px; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; font-weight:700; }
+  .nowplaying .meta .t2{ font-size:13.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nowplaying .meta .t3{ font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nowplaying-wrap{ width:100%; }
+  .np-img{ width:100%; max-width:100%; border-radius:18px; display:block; box-shadow:0 8px 20px -6px rgba(58,46,34,0.25); }
+
+  .hint{ margin-top:18px; font-size:10px; color:var(--muted); opacity:.55; letter-spacing:.01em; }
+
+  .h2{ font-size:22px; font-weight:800; margin-bottom:16px; letter-spacing:-0.01em; }
+  .bio{ font-size:13.6px; line-height:1.9; color:var(--ink); text-align:left; white-space:pre-line; margin-bottom:20px; font-weight:450; }
+  .traits{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .trait{ background:var(--glass-strong); border:1px solid var(--line); border-radius:16px; padding:13px; text-align:left; }
+  .trait .ic{ font-size:17px; }
+  .trait .tt{ font-size:12.5px; font-weight:700; margin-top:5px; }
+  .trait .dd{ font-size:11px; color:var(--muted); margin-top:2px; line-height:1.5; font-weight:500; }
+
+  .links{ display:flex; flex-direction:column; gap:10px; }
+  .links a{
+    display:flex; align-items:center; gap:12px;
+    padding:14px 16px; border-radius:16px;
+    background: var(--glass-strong); border:1px solid var(--line);
+    text-decoration:none; color:var(--ink); font-weight:600; font-size:14px;
+    transition: transform .2s var(--ease), background .2s ease;
+  }
+  .links a:active{ transform: scale(.97); }
+  .links .ic{ width:30px; height:30px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:15px; background:linear-gradient(135deg,var(--rust),var(--moss)); color:#fff; flex-shrink:0; }
+
+  .gallery-note{ font-size:12px; color:var(--muted); margin-bottom:14px; text-align:left; line-height:1.6; font-weight:500; }
+  .masonry{ column-count:2; column-gap:10px; }
+  .pin{
+    break-inside: avoid; margin-bottom:10px; border-radius:16px; overflow:hidden;
+    border:1px solid var(--line); background:var(--glass-strong);
+    display:block; text-decoration:none; color:var(--ink); position:relative;
+  }
+  .pin .ph{ width:100%; display:block; background:linear-gradient(135deg,#D9A05B33,#6E7A5233); }
+  .pin .cap{ font-size:11px; font-weight:700; padding:8px 10px; }
+  .pin.h1{ height:130px; } .pin.h2{ height:170px; } .pin.h3{ height:100px; } .pin.h4{ height:150px; }
+  .albumbtn{
+    display:block; text-align:center; margin-top:14px; padding:13px; border-radius:16px;
+    background: var(--ink); color:#F6EEDF; font-weight:700; font-size:13px; text-decoration:none;
+    transition: opacity .2s ease;
+  }
+  .albumbtn:active{ opacity:.8; }
+
+  .dots{ position:fixed; bottom:22px; left:0; right:0; display:flex; justify-content:center; gap:8px; z-index:5; }
+  .dot{ width:7px; height:7px; border-radius:50%; background: rgba(58,46,34,0.25); transition: all .35s var(--ease); }
+  .dot.active{ background: var(--rust); width:22px; border-radius:4px; }
+</style>
 </head>
 <body>
-  <p>正在跳轉,如果沒有自動跳轉請點<a href="https://furid.co/julinar06">這裡</a></p>
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+
+  <audio id="eggAudio" src="audio/easter-egg.mp3" preload="auto"></audio>
+
+  <div class="app" id="app">
+    <div class="track" id="track">
+
+      <!-- 複製的 P4（放在最前面，用於「往前滑回到最後一頁」的無縫循環） -->
+      <div class="page" id="p4clone">
+        <div class="glass">
+          <div class="h2">照片牆</div>
+          <div class="gallery-note">照片存放在 Flickr 雲端相簿。</div>
+          <div class="masonry">
+            <div class="pin h2"><div class="ph" style="height:100%"></div><div class="cap">生活紀錄</div></div>
+            <div class="pin h1"><div class="ph" style="height:100%"></div><div class="cap">毛毛照片</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="p1">
+        <div class="glass">
+          <div class="avatar" id="avatarWrap"><img id="avatarImg" src="images/avatar.png" alt="Julian"></div>
+          <div class="hello">Hi, my name is</div>
+          <div class="name">Julian</div>
+          <div class="sub">紫毛狐狸 · 攝影師 · 快門自由</div>
+          <div class="tags">
+            <span class="tag accent">🦊 Fox</span>
+            <span class="tag">INFP</span>
+            <span class="tag">Anemoia</span>
+          </div>
+          <div class="nowplaying-wrap">
+            <img id="npImg" class="np-img" alt="Spotify Now Playing"
+                 src="https://novatorem-39a6-nine.vercel.app/api"
+                 onerror="this.style.display='none'; document.getElementById('npFallback').style.display='flex';">
+            <div class="nowplaying" id="npFallback" style="display:none;">
+              <div class="cover">🎵</div>
+              <div class="meta">
+                <div class="t1">Now Playing</div>
+                <div class="t2">尚未連接</div>
+                <div class="t3">設定 Vercel 網址後即可顯示</div>
+              </div>
+            </div>
+          </div>
+          <div class="hint">(聽說常按頭貼114514毫秒會有好康的)</div>
+        </div>
+      </div>
+
+      <div class="page" id="p2">
+        <div class="glass">
+          <div class="h2">關於我</div>
+          <div class="bio">嗨嗨，我是朱利安 / 朱，INFP，Anemoia。
+假日喜歡拿相機開車到處亂晃，記錄生活與思考狐生。
+最近脫離底片坑，終於實現快門自由，立志成為毛毛攝影師。
+
+音樂品味偏 60s~80s 西洋老歌與現代嘻哈，最愛 Kanye West。
+遊戲是 Xbox 玩家，Game Pass 有什麼玩什麼，maimai 摸摸仔。</div>
+          <div class="traits">
+            <div class="trait"><div class="ic">📷</div><div class="tt">攝影師</div><div class="dd">假日開車亂晃拍照，Lightroom 調色控</div></div>
+            <div class="trait"><div class="ic">🎮</div><div class="tt">Xbox 玩家</div><div class="dd">Game Pass 有什麼玩什麼</div></div>
+            <div class="trait"><div class="ic">🎧</div><div class="tt">雜食樂迷</div><div class="dd">60s-80s 老歌 & 現代嘻哈</div></div>
+            <div class="trait"><div class="ic">🦊</div><div class="tt">紫毛狐狸</div><div class="dd">獸設與人設相同</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="p3">
+        <div class="glass">
+          <div class="h2">聯絡我</div>
+          <div class="links">
+            <a href="https://www.facebook.com/share/1A2KWGYnZW/" target="_blank" rel="noopener"><span class="ic">f</span> Facebook</a>
+            <a href="https://discord.com/users/605682374717734932" target="_blank" rel="noopener"><span class="ic">💬</span> Discord</a>
+            <a href="https://t.me/JulianR604" target="_blank" rel="noopener"><span class="ic">✈️</span> Telegram</a>
+            <a href="https://open.spotify.com/user/tteeuio123" target="_blank" rel="noopener"><span class="ic">🎵</span> Spotify</a>
+            <a href="https://www.xbox.com/zh-TW/play/user/JulianR068804" target="_blank" rel="noopener"><span class="ic">🎮</span> Xbox</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="p4">
+        <div class="glass">
+          <div class="h2">照片牆</div>
+          <div class="gallery-note">照片存放在 Flickr 雲端相簿，這裡先放預覽格，之後可換成縮圖連結。</div>
+          <div class="masonry">
+            <a class="pin h2" href="https://www.flickr.com/gp/204066960@N03/7K8j6DK20v" target="_blank" rel="noopener"><div class="ph" style="height:100%"></div><div class="cap">生活紀錄</div></a>
+            <a class="pin h1" href="https://www.flickr.com/gp/204066960@N03/86L0A3Cs1y" target="_blank" rel="noopener"><div class="ph" style="height:100%"></div><div class="cap">毛毛照片</div></a>
+            <a class="pin h3" href="https://www.flickr.com/gp/204066960@N03/7K8j6DK20v" target="_blank" rel="noopener"><div class="ph" style="height:100%"></div><div class="cap">生活紀錄</div></a>
+            <a class="pin h4" href="https://www.flickr.com/gp/204066960@N03/86L0A3Cs1y" target="_blank" rel="noopener"><div class="ph" style="height:100%"></div><div class="cap">毛毛照片</div></a>
+          </div>
+          <a class="albumbtn" href="https://www.flickr.com/gp/204066960@N03/7K8j6DK20v" target="_blank" rel="noopener">查看完整相簿 →</a>
+        </div>
+      </div>
+
+      <!-- 複製的 P1（放在最後面，用於「往後滑回到第一頁」的無縫循環） -->
+      <div class="page" id="p1clone">
+        <div class="glass">
+          <div class="avatar"><img src="images/avatar.png" alt="Julian"></div>
+          <div class="hello">Hi, my name is</div>
+          <div class="name" style="animation:none; opacity:1; transform:none; filter:none;">Julian</div>
+          <div class="sub">紫毛狐狸 · 攝影師 · 快門自由</div>
+          <div class="tags">
+            <span class="tag accent">🦊 Fox</span>
+            <span class="tag">INFP</span>
+            <span class="tag">Anemoia</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="dots">
+    <div class="dot active" data-i="0"></div>
+    <div class="dot" data-i="1"></div>
+    <div class="dot" data-i="2"></div>
+    <div class="dot" data-i="3"></div>
+  </div>
+
+<script>
+  const track = document.getElementById('track');
+  const dots = document.querySelectorAll('.dot');
+  const allGlass = document.querySelectorAll('.glass');
+  const realPages = document.querySelectorAll('#p1 .glass, #p2 .glass, #p3 .glass, #p4 .glass');
+  let current = 0;
+  const total = 4;           // 真實頁數 (p1~p4)
+  const SLIDE = 100/6;       // 每格佔軌道百分比（共 6 格：p4複製+4頁+p1複製）
+  let looping = false;
+
+  function playCardFrost(){
+    allGlass.forEach(g=>{
+      g.classList.remove('frosting');
+      void g.offsetWidth;
+      g.classList.add('frosting');
+    });
+  }
+
+  function replayEntrance(i){
+    const g = realPages[i];
+    g.style.animation = 'none';
+    void g.offsetWidth;
+    g.style.animation = '';
+    if(i === 0){
+      const n = document.querySelector('#p1 .name');
+      n.style.animation = 'none';
+      void n.offsetWidth;
+      n.style.opacity = '0';
+      n.style.transform = 'scale(1.3)';
+      n.style.filter = 'blur(8px)';
+      n.style.removeProperty('animation');
+      requestAnimationFrame(()=>{ n.style.animation = 'fadeZoom 1s var(--ease) forwards'; });
+    }
+  }
+
+  function setDot(i){
+    dots.forEach((d,idx)=> d.classList.toggle('active', idx===i));
+  }
+
+  // 軌道位移： slide index = current + 1（因為最前面多了一格 p4複製）
+  function applyTransform(){
+    track.style.transform = `translateX(-${(current+1) * SLIDE}%)`;
+  }
+
+  function goTo(i){
+    if(looping) return;
+    if(i >= total){ loopForward(); return; }
+    if(i < 0){ loopBackward(); return; }
+    const prev = current;
+    current = i;
+    playCardFrost();
+    applyTransform();
+    setDot(current);
+    if(prev !== current) replayEntrance(current);
+  }
+
+  function loopForward(){
+    looping = true;
+    playCardFrost();
+    track.style.transition = '';
+    track.style.transform = `translateX(-${5 * SLIDE}%)`; // 滑到尾端複製的 p1
+    setDot(0);
+    const onEnd = (ev)=>{
+      if(ev.propertyName !== 'transform') return;
+      track.removeEventListener('transitionend', onEnd);
+      track.style.transition = 'none';
+      current = 0;
+      applyTransform();
+      void track.offsetWidth;
+      track.style.transition = '';
+      replayEntrance(0);
+      looping = false;
+    };
+    track.addEventListener('transitionend', onEnd);
+  }
+
+  function loopBackward(){
+    looping = true;
+    playCardFrost();
+    track.style.transition = '';
+    track.style.transform = `translateX(0%)`; // 滑到最前端複製的 p4
+    setDot(3);
+    const onEnd = (ev)=>{
+      if(ev.propertyName !== 'transform') return;
+      track.removeEventListener('transitionend', onEnd);
+      track.style.transition = 'none';
+      current = 3;
+      applyTransform();
+      void track.offsetWidth;
+      track.style.transition = '';
+      replayEntrance(3);
+      looping = false;
+    };
+    track.addEventListener('transitionend', onEnd);
+  }
+
+  dots.forEach(d => d.addEventListener('click', ()=> goTo(parseInt(d.dataset.i))));
+
+  const app = document.getElementById('app');
+  let startX = 0, startY = 0, dragX = 0, isDragging = false, lockAxis = null;
+
+  function dragStart(x, y){
+    if(looping) return;
+    startX = x; startY = y; dragX = 0;
+    isDragging = true; lockAxis = null;
+    track.style.transition = 'none';
+  }
+  function dragMove(x, y){
+    if(!isDragging) return;
+    const dx = x - startX;
+    const dy = y - startY;
+    if(lockAxis === null){
+      lockAxis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    if(lockAxis === 'y') return;
+    dragX = dx;
+    const basePercent = -((current+1) * SLIDE);
+    const dragPercent = (dx / window.innerWidth) * SLIDE;
+    track.style.transform = `translateX(${basePercent + dragPercent}%)`;
+  }
+  function dragEnd(){
+    if(!isDragging) return;
+    isDragging = false;
+    track.style.transition = '';
+    const threshold = window.innerWidth * 0.15;
+    if(lockAxis === 'x'){
+      if(dragX < -threshold) goTo(current+1);
+      else if(dragX > threshold) goTo(current-1);
+      else goTo(current);
+    } else {
+      goTo(current);
+    }
+  }
+
+  app.addEventListener('touchstart', e=>{ dragStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+  app.addEventListener('touchmove', e=>{ dragMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive:true});
+  app.addEventListener('touchend', dragEnd);
+
+  let mouseDownX = 0, mouseDownY = 0, realDrag = false;
+  const DRAG_THRESHOLD = 6;
+
+  app.addEventListener('mousedown', e=>{
+    mouseDownX = e.clientX; mouseDownY = e.clientY;
+    realDrag = false;
+    dragStart(e.clientX, e.clientY);
+  });
+
+  window.addEventListener('mousemove', e=>{
+    if(!isDragging) return;
+    if(!realDrag){
+      const moved = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
+      if(moved < DRAG_THRESHOLD) return;
+      realDrag = true;
+      app.style.cursor = 'grabbing';
+    }
+    dragMove(e.clientX, e.clientY);
+  });
+
+  window.addEventListener('mouseup', e=>{
+    if(realDrag){
+      dragEnd();
+      const blockClick = ev => { ev.stopPropagation(); ev.preventDefault(); window.removeEventListener('click', blockClick, true); };
+      window.addEventListener('click', blockClick, true);
+    } else {
+      isDragging = false;
+      track.style.transition = '';
+    }
+    app.style.cursor = 'grab';
+  });
+
+  app.style.cursor = 'grab';
+  track.style.transition = 'none';
+  applyTransform(); // 初始定位到真正的 p1（index 1）
+  void track.offsetWidth;
+  track.style.transition = '';
+
+  window.addEventListener('keydown', e=>{
+    if(e.key==='ArrowRight') goTo(current+1);
+    if(e.key==='ArrowLeft') goTo(current-1);
+  });
+
+  // ---------- 頭貼彩蛋：長按 114514 毫秒 ----------
+  const avatarWrap = document.getElementById('avatarWrap');
+  const avatarImg = document.getElementById('avatarImg');
+  const eggAudio = document.getElementById('eggAudio');
+  let pressTimer = null;
+
+  function startPress(e){
+    e.stopPropagation();
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(()=>{
+      avatarImg.src = 'images/avatar-easter-egg.png';
+      try{ eggAudio.currentTime = 0; eggAudio.play(); }catch(err){}
+    }, 114514);
+  }
+  function endPress(e){
+    e.stopPropagation();
+    clearTimeout(pressTimer);
+  }
+
+  avatarWrap.addEventListener('mousedown', startPress);
+  avatarWrap.addEventListener('touchstart', startPress, {passive:true});
+  avatarWrap.addEventListener('mouseup', endPress);
+  avatarWrap.addEventListener('mouseleave', endPress);
+  avatarWrap.addEventListener('touchend', endPress);
+  avatarWrap.addEventListener('touchcancel', endPress);
+</script>
 </body>
 </html>
