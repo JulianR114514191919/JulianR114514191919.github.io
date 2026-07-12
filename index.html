@@ -36,26 +36,29 @@
 
   .app{ position:relative; height:100dvh; width:100%; overflow:hidden; z-index:1; }
 
-  /* 6 格：p4複製 + p1 + p2 + p3 + p4 + p1複製，做雙向無縫循環 */
-  .track{ display:flex; height:100%; width:600%; transition: transform .55s var(--ease); }
-  .page{ width:16.6667%; height:100%; display:flex; align-items:center; justify-content:center; padding: 28px 20px 90px; }
+  /* 7 格： p5複製 + p1 + p2 + p3 + p4 + p5 + p1複製 → 雙向無縫循環 */
+  .track{ display:flex; height:100%; width:700%; transition: transform .55s var(--ease); }
+  .page{ width:14.2857%; height:100%; display:flex; align-items:center; justify-content:center; padding: 28px 20px 90px; }
 
   .glass{
-    width:100%; max-width:420px; max-height: 100%;
+    width:100%; max-width:420px;
+    height:min(600px, 78dvh);
     background: var(--glass);
     backdrop-filter: blur(30px) saturate(180%);
     -webkit-backdrop-filter: blur(30px) saturate(180%);
     border: 1px solid var(--line);
     border-radius: 30px;
-    padding: 36px 28px;
+    padding: 34px 26px;
     box-shadow: 0 1px 1px rgba(255,255,255,0.4) inset, 0 20px 50px -20px rgba(58,46,34,0.28);
     overflow-y: auto;
+    display:flex; flex-direction:column; justify-content:center;
     animation: rise .6s var(--ease) both;
   }
+  .glass.top{ justify-content:flex-start; }
+  .glass.fill{ justify-content:stretch; }
   @keyframes rise{ from{ opacity:0; transform: translateY(14px) scale(.98);} to{ opacity:1; transform: translateY(0) scale(1);} }
   .glass::-webkit-scrollbar{ display:none; }
 
-  /* 卡牌本身的霧化效果（滑走瞬間），輕量、只作用在卡片上 */
   @keyframes cardfrost{
     0%{ filter: blur(0px); }
     45%{ filter: blur(3.5px); }
@@ -100,13 +103,31 @@
 
   .hint{ margin-top:18px; font-size:10px; color:var(--muted); opacity:.55; letter-spacing:.01em; }
 
-  .h2{ font-size:22px; font-weight:800; margin-bottom:16px; letter-spacing:-0.01em; }
-  .bio{ font-size:13.6px; line-height:1.9; color:var(--ink); text-align:left; white-space:pre-line; margin-bottom:20px; font-weight:450; }
-  .traits{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .trait{ background:var(--glass-strong); border:1px solid var(--line); border-radius:16px; padding:13px; text-align:left; }
-  .trait .ic{ font-size:17px; }
-  .trait .tt{ font-size:12.5px; font-weight:700; margin-top:5px; }
-  .trait .dd{ font-size:11px; color:var(--muted); margin-top:2px; line-height:1.5; font-weight:500; }
+  .h2{ font-size:22px; font-weight:800; margin-bottom:16px; letter-spacing:-0.01em; flex-shrink:0; }
+
+  /* ---------- About 頁：四方塊 ---------- */
+  .about-grid{
+    display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;
+    gap:10px; flex:1; min-height:0;
+  }
+  .about-tile{
+    position:relative; border-radius:20px; overflow:hidden;
+    background: var(--glass-strong); border:1px solid var(--line);
+    display:flex; flex-direction:column; justify-content:flex-end;
+    padding:14px; text-align:left; cursor:pointer;
+    transition: transform .2s var(--ease);
+  }
+  .about-tile:active{ transform: scale(.96); }
+  .about-tile .ic{ font-size:20px; margin-bottom:4px; }
+  .about-tile .tt{ font-size:13px; font-weight:800; }
+  .about-tile .dd{ font-size:10px; color:var(--muted); font-weight:600; margin-top:2px; }
+  .about-tile.ref{
+    background-image: linear-gradient(180deg, rgba(58,46,34,0) 40%, rgba(58,46,34,.55) 100%), url('images/reference-sheet.webp');
+    background-size: cover; background-position: center 20%;
+  }
+  .about-tile.ref .tt, .about-tile.ref .dd{ color:#F6EEDF; }
+
+  .bio{ font-size:13.6px; line-height:1.9; color:var(--ink); text-align:left; white-space:pre-line; font-weight:450; }
 
   .links{ display:flex; flex-direction:column; gap:10px; }
   .links a{
@@ -119,7 +140,12 @@
   .links a:active{ transform: scale(.97); }
   .links .ic{ width:30px; height:30px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:15px; background:linear-gradient(135deg,var(--rust),var(--moss)); color:#fff; flex-shrink:0; }
 
-  .gallery-note{ font-size:12px; color:var(--muted); margin-bottom:14px; text-align:left; line-height:1.6; font-weight:500; }
+  /* ---------- 歌單頁 ---------- */
+  .playlist-sub{ font-size:12.5px; color:var(--muted); margin-bottom:18px; font-weight:500; line-height:1.6; }
+  .playlist-embed{ border-radius:16px; overflow:hidden; border:1px solid var(--line); }
+  .playlist-embed iframe{ display:block; width:100%; }
+
+  .gallery-note{ font-size:12px; color:var(--muted); margin-bottom:14px; text-align:left; line-height:1.6; font-weight:500; flex-shrink:0; }
   .masonry{ column-count:2; column-gap:10px; }
   .pin{
     break-inside: avoid; margin-bottom:10px; border-radius:16px; overflow:hidden;
@@ -128,17 +154,47 @@
   }
   .pin .ph{ width:100%; display:block; background:linear-gradient(135deg,#D9A05B33,#6E7A5233); }
   .pin .cap{ font-size:11px; font-weight:700; padding:8px 10px; }
-  .pin.h1{ height:130px; } .pin.h2{ height:170px; } .pin.h3{ height:100px; } .pin.h4{ height:150px; }
+  .pin.h1{ height:110px; } .pin.h2{ height:150px; } .pin.h3{ height:90px; } .pin.h4{ height:130px; }
   .albumbtn{
     display:block; text-align:center; margin-top:14px; padding:13px; border-radius:16px;
     background: var(--ink); color:#F6EEDF; font-weight:700; font-size:13px; text-decoration:none;
-    transition: opacity .2s ease;
+    transition: opacity .2s ease; flex-shrink:0;
   }
   .albumbtn:active{ opacity:.8; }
 
   .dots{ position:fixed; bottom:22px; left:0; right:0; display:flex; justify-content:center; gap:8px; z-index:5; }
   .dot{ width:7px; height:7px; border-radius:50%; background: rgba(58,46,34,0.25); transition: all .35s var(--ease); }
   .dot.active{ background: var(--rust); width:22px; border-radius:4px; }
+
+  /* ---------- Modal（毛玻璃彈出層） ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:24px;
+    background: rgba(58,46,34,0.28);
+    backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px);
+    opacity:0; pointer-events:none;
+    transition: opacity .35s var(--ease), backdrop-filter .35s var(--ease), -webkit-backdrop-filter .35s var(--ease);
+  }
+  .modal-overlay.open{
+    opacity:1; pointer-events:auto;
+    backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%);
+  }
+  .modal-card{
+    width:100%; max-width:420px; max-height:80dvh; overflow-y:auto;
+    background: var(--glass-strong); border:1px solid var(--line); border-radius:28px; padding:30px 26px;
+    box-shadow: 0 30px 60px -20px rgba(58,46,34,.45);
+    transform: scale(.85) translateY(10px); opacity:0;
+    transition: transform .38s var(--ease), opacity .38s var(--ease);
+    position:relative;
+  }
+  .modal-card::-webkit-scrollbar{ display:none; }
+  .modal-overlay.open .modal-card{ transform: scale(1) translateY(0); opacity:1; }
+  .modal-close{
+    position:absolute; top:16px; right:16px; width:30px; height:30px; border-radius:50%;
+    background: rgba(58,46,34,0.1); border:none; color:var(--ink); font-size:14px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .modal-title{ font-size:19px; font-weight:800; margin-bottom:14px; padding-right:30px; }
+  .modal-img{ width:100%; border-radius:18px; display:block; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -150,11 +206,10 @@
   <div class="app" id="app">
     <div class="track" id="track">
 
-      <!-- 複製的 P4（放在最前面，用於「往前滑回到最後一頁」的無縫循環） -->
-      <div class="page" id="p4clone">
-        <div class="glass">
+      <!-- 複製的 P5（照片牆），放最前面用於反向無縫循環 -->
+      <div class="page" id="p5clone">
+        <div class="glass top">
           <div class="h2">照片牆</div>
-          <div class="gallery-note">照片存放在 Flickr 雲端相簿。</div>
           <div class="masonry">
             <div class="pin h2"><div class="ph" style="height:100%"></div><div class="cap">生活紀錄</div></div>
             <div class="pin h1"><div class="ph" style="height:100%"></div><div class="cap">毛毛照片</div></div>
@@ -162,6 +217,7 @@
         </div>
       </div>
 
+      <!-- P1 Hello -->
       <div class="page" id="p1">
         <div class="glass">
           <div class="avatar" id="avatarWrap"><img id="avatarImg" src="images/avatar.png" alt="Julian"></div>
@@ -190,24 +246,36 @@
         </div>
       </div>
 
+      <!-- P2 About：四方塊 -->
       <div class="page" id="p2">
-        <div class="glass">
+        <div class="glass fill">
           <div class="h2">關於我</div>
-          <div class="bio">嗨嗨，我是朱利安 / 朱，INFP，Anemoia。
-假日喜歡拿相機開車到處亂晃，記錄生活與思考狐生。
-最近脫離底片坑，終於實現快門自由，立志成為毛毛攝影師。
-
-音樂品味偏 60s~80s 西洋老歌與現代嘻哈，最愛 Kanye West。
-遊戲是 Xbox 玩家，Game Pass 有什麼玩什麼，maimai 摸摸仔。</div>
-          <div class="traits">
-            <div class="trait"><div class="ic">📷</div><div class="tt">攝影師</div><div class="dd">假日開車亂晃拍照，Lightroom 調色控</div></div>
-            <div class="trait"><div class="ic">🎮</div><div class="tt">Xbox 玩家</div><div class="dd">Game Pass 有什麼玩什麼</div></div>
-            <div class="trait"><div class="ic">🎧</div><div class="tt">雜食樂迷</div><div class="dd">60s-80s 老歌 & 現代嘻哈</div></div>
-            <div class="trait"><div class="ic">🦊</div><div class="tt">紫毛狐狸</div><div class="dd">獸設與人設相同</div></div>
+          <div class="about-grid">
+            <div class="about-tile" id="tileBio">
+              <div class="ic">📝</div>
+              <div class="tt">自介</div>
+              <div class="dd">點開看完整介紹</div>
+            </div>
+            <div class="about-tile ref" id="tileRef">
+              <div class="ic">🎨</div>
+              <div class="tt">設定圖</div>
+              <div class="dd">Julian 的角色設定</div>
+            </div>
+            <div class="about-tile" id="tileMusic">
+              <div class="ic">🎧</div>
+              <div class="tt">私心歌單</div>
+              <div class="dd">點擊前往歌單頁</div>
+            </div>
+            <div class="about-tile" id="tilePhoto">
+              <div class="ic">📷</div>
+              <div class="tt">攝影作品</div>
+              <div class="dd">點擊前往照片牆</div>
+            </div>
           </div>
         </div>
       </div>
 
+      <!-- P3 Social -->
       <div class="page" id="p3">
         <div class="glass">
           <div class="h2">聯絡我</div>
@@ -221,8 +289,21 @@
         </div>
       </div>
 
+      <!-- P4 私心歌單 -->
       <div class="page" id="p4">
         <div class="glass">
+          <div class="h2">私心歌單</div>
+          <div class="playlist-sub">最近單曲循環的清單，60s-80s 老歌配現代嘻哈，開車兜風必備。</div>
+          <div class="playlist-embed">
+            <iframe src="https://open.spotify.com/embed/playlist/2gATEirHEhc8MiQpE2MBGS?utm_source=generator&theme=0"
+              width="100%" height="352" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- P5 照片牆 -->
+      <div class="page" id="p5">
+        <div class="glass top">
           <div class="h2">照片牆</div>
           <div class="gallery-note">照片存放在 Flickr 雲端相簿，這裡先放預覽格，之後可換成縮圖連結。</div>
           <div class="masonry">
@@ -235,7 +316,7 @@
         </div>
       </div>
 
-      <!-- 複製的 P1（放在最後面，用於「往後滑回到第一頁」的無縫循環） -->
+      <!-- 複製的 P1，放最後面用於正向無縫循環 -->
       <div class="page" id="p1clone">
         <div class="glass">
           <div class="avatar"><img src="images/avatar.png" alt="Julian"></div>
@@ -258,16 +339,25 @@
     <div class="dot" data-i="1"></div>
     <div class="dot" data-i="2"></div>
     <div class="dot" data-i="3"></div>
+    <div class="dot" data-i="4"></div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-card" id="modalCard">
+      <button class="modal-close" id="modalClose">✕</button>
+      <div id="modalBody"></div>
+    </div>
   </div>
 
 <script>
   const track = document.getElementById('track');
   const dots = document.querySelectorAll('.dot');
   const allGlass = document.querySelectorAll('.glass');
-  const realPages = document.querySelectorAll('#p1 .glass, #p2 .glass, #p3 .glass, #p4 .glass');
+  const realPages = document.querySelectorAll('#p1 .glass, #p2 .glass, #p3 .glass, #p4 .glass, #p5 .glass');
   let current = 0;
-  const total = 4;           // 真實頁數 (p1~p4)
-  const SLIDE = 100/6;       // 每格佔軌道百分比（共 6 格：p4複製+4頁+p1複製）
+  const total = 5;            // 真實頁數 (p1~p5)
+  const SLIDE = 100/7;        // 每格佔軌道百分比（共 7 格：p5複製+5頁+p1複製）
   let looping = false;
 
   function playCardFrost(){
@@ -284,6 +374,7 @@
     void g.offsetWidth;
     g.style.animation = '';
     if(i === 0){
+      if(typeof resetEgg === 'function') resetEgg();
       const n = document.querySelector('#p1 .name');
       n.style.animation = 'none';
       void n.offsetWidth;
@@ -299,7 +390,7 @@
     dots.forEach((d,idx)=> d.classList.toggle('active', idx===i));
   }
 
-  // 軌道位移： slide index = current + 1（因為最前面多了一格 p4複製）
+  // 軌道位移： slide index = current + 1（因為最前面多了一格 p5複製）
   function applyTransform(){
     track.style.transform = `translateX(-${(current+1) * SLIDE}%)`;
   }
@@ -310,6 +401,7 @@
     if(i < 0){ loopBackward(); return; }
     const prev = current;
     current = i;
+    if(prev === 0 && current !== 0 && typeof resetEgg === 'function') resetEgg();
     playCardFrost();
     applyTransform();
     setDot(current);
@@ -320,7 +412,7 @@
     looping = true;
     playCardFrost();
     track.style.transition = '';
-    track.style.transform = `translateX(-${5 * SLIDE}%)`; // 滑到尾端複製的 p1
+    track.style.transform = `translateX(-${(total+1) * SLIDE}%)`; // 滑到尾端複製的 p1
     setDot(0);
     const onEnd = (ev)=>{
       if(ev.propertyName !== 'transform') return;
@@ -338,19 +430,20 @@
 
   function loopBackward(){
     looping = true;
+    if(typeof resetEgg === 'function') resetEgg();
     playCardFrost();
     track.style.transition = '';
-    track.style.transform = `translateX(0%)`; // 滑到最前端複製的 p4
-    setDot(3);
+    track.style.transform = `translateX(0%)`; // 滑到最前端複製的 p5
+    setDot(total-1);
     const onEnd = (ev)=>{
       if(ev.propertyName !== 'transform') return;
       track.removeEventListener('transitionend', onEnd);
       track.style.transition = 'none';
-      current = 3;
+      current = total-1;
       applyTransform();
       void track.offsetWidth;
       track.style.transition = '';
-      replayEntrance(3);
+      replayEntrance(total-1);
       looping = false;
     };
     track.addEventListener('transitionend', onEnd);
@@ -432,7 +525,7 @@
 
   app.style.cursor = 'grab';
   track.style.transition = 'none';
-  applyTransform(); // 初始定位到真正的 p1（index 1）
+  applyTransform();
   void track.offsetWidth;
   track.style.transition = '';
 
@@ -441,31 +534,111 @@
     if(e.key==='ArrowLeft') goTo(current-1);
   });
 
-  // ---------- 頭貼彩蛋：長按 114514 毫秒 ----------
+  // 滑鼠滾輪翻頁（電腦版）
+  let wheelLock = false;
+  app.addEventListener('wheel', e=>{
+    if(wheelLock || looping) return;
+    const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if(Math.abs(delta) < 12) return;
+    wheelLock = true;
+    if(delta > 0) goTo(current+1); else goTo(current-1);
+    setTimeout(()=>{ wheelLock = false; }, 650);
+  }, {passive:true});
+
+  // ---------- 頭貼彩蛋 ----------
   const avatarWrap = document.getElementById('avatarWrap');
   const avatarImg = document.getElementById('avatarImg');
   const eggAudio = document.getElementById('eggAudio');
-  let pressTimer = null;
+  const subText = document.querySelector('#p1 .sub');
+  const ORIGINAL_AVATAR = 'images/avatar.png';
+  const EGG_AVATAR = 'images/avatar-easter-egg.png';
+  const ORIGINAL_SUB = subText.textContent;
+  const EGG_SUB = '(25歲，是個老人)';
+  const STAGE2_URL = 'https://youtu.be/dQw4w9WgXcQ?si=Ba_6rd1HG80EjtXY';
 
+  let eggStage = 0;
+  let pressTimer = null;
+  let clickCount = 0;
+
+  function triggerStage1(){
+    if(eggStage !== 0) return;
+    eggStage = 1;
+    clickCount = 0;
+    avatarImg.src = EGG_AVATAR;
+    subText.textContent = EGG_SUB;
+    try{ eggAudio.currentTime = 0; eggAudio.play(); }catch(err){}
+  }
+  function triggerStage2(){
+    if(eggStage !== 1) return;
+    window.location.href = STAGE2_URL;
+  }
+  function resetEgg(){
+    eggStage = 0;
+    clickCount = 0;
+    clearTimeout(pressTimer);
+    avatarImg.src = ORIGINAL_AVATAR;
+    subText.textContent = ORIGINAL_SUB;
+  }
+  function currentPressDuration(){
+    return eggStage === 0 ? 11451 : 11000;
+  }
   function startPress(e){
     e.stopPropagation();
     clearTimeout(pressTimer);
     pressTimer = setTimeout(()=>{
-      avatarImg.src = 'images/avatar-easter-egg.png';
-      try{ eggAudio.currentTime = 0; eggAudio.play(); }catch(err){}
-    }, 11451);
+      if(eggStage === 0) triggerStage1();
+      else if(eggStage === 1) triggerStage2();
+    }, currentPressDuration());
   }
   function endPress(e){
     e.stopPropagation();
     clearTimeout(pressTimer);
   }
-
+  function handleClick(e){
+    e.stopPropagation();
+    clickCount++;
+    if(clickCount >= 11){
+      clickCount = 0;
+      if(eggStage === 0) triggerStage1();
+      else if(eggStage === 1) triggerStage2();
+    }
+  }
   avatarWrap.addEventListener('mousedown', startPress);
   avatarWrap.addEventListener('touchstart', startPress, {passive:true});
   avatarWrap.addEventListener('mouseup', endPress);
   avatarWrap.addEventListener('mouseleave', endPress);
   avatarWrap.addEventListener('touchend', endPress);
   avatarWrap.addEventListener('touchcancel', endPress);
+  avatarWrap.addEventListener('click', handleClick);
+
+  // ---------- About 頁：四方塊互動 ----------
+  const BIO_HTML = `<div class="modal-title">自介</div><div class="bio">嗨嗨，我是朱利安 / 朱，INFP，Anemoia。
+假日喜歡拿相機開車到處亂晃，記錄生活與思考狐生。
+最近脫離底片坑，終於實現快門自由，立志成為毛毛攝影師。
+
+音樂品味偏 60s~80s 西洋老歌與現代嘻哈，最愛 Kanye West。
+遊戲是 Xbox 玩家，Game Pass 有什麼玩什麼，maimai 摸摸仔。</div>`;
+
+  const REF_HTML = `<div class="modal-title">設定圖</div><img class="modal-img" src="images/reference-sheet.webp" alt="Julian 角色設定圖">`;
+
+  const modalOverlay = document.getElementById('modalOverlay');
+  const modalBody = document.getElementById('modalBody');
+  const modalClose = document.getElementById('modalClose');
+
+  function openModal(html){
+    modalBody.innerHTML = html;
+    modalOverlay.classList.add('open');
+  }
+  function closeModal(){
+    modalOverlay.classList.remove('open');
+  }
+  modalClose.addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', e=>{ if(e.target === modalOverlay) closeModal(); });
+
+  document.getElementById('tileBio').addEventListener('click', ()=> openModal(BIO_HTML));
+  document.getElementById('tileRef').addEventListener('click', ()=> openModal(REF_HTML));
+  document.getElementById('tileMusic').addEventListener('click', ()=> goTo(3));
+  document.getElementById('tilePhoto').addEventListener('click', ()=> goTo(4));
 </script>
 </body>
 </html>
