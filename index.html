@@ -196,11 +196,11 @@
   .modal-title{ font-size:19px; font-weight:800; margin-bottom:14px; padding-right:30px; }
   .modal-img{ width:100%; border-radius:18px; display:block; margin-top:4px; }
 
-  /* ---------- 行事曆下滑面板 ---------- */
+  /* ---------- 行事曆上滑面板 ---------- */
   .cal-handle{
-    position:fixed; top:10px; left:50%; transform:translateX(-50%);
+    position:fixed; bottom:8px; left:50%; transform:translateX(-50%);
     width:44px; height:5px; border-radius:999px;
-    background: rgba(58,46,34,0.28);
+    background: rgba(58,46,34,0.32);
     z-index:40; cursor:pointer;
   }
   .cal-overlay{
@@ -215,14 +215,14 @@
     backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
   }
   .cal-sheet{
-    position:absolute; top:0; left:0; right:0;
+    position:absolute; bottom:0; left:0; right:0;
     max-width:480px; margin:0 auto;
     background: var(--glass-strong);
-    border-bottom-left-radius:32px; border-bottom-right-radius:32px;
-    border:1px solid var(--line); border-top:none;
-    padding: 22px 24px 30px;
-    box-shadow: 0 30px 60px -20px rgba(58,46,34,.4);
-    transform: translateY(-100%);
+    border-top-left-radius:32px; border-top-right-radius:32px;
+    border:1px solid var(--line); border-bottom:none;
+    padding: 18px 24px calc(30px + env(safe-area-inset-bottom));
+    box-shadow: 0 -20px 50px -20px rgba(58,46,34,.4);
+    transform: translateY(100%);
     transition: transform .48s var(--ease);
     max-height: 84dvh; overflow-y:auto;
   }
@@ -534,7 +534,7 @@
 
   const app = document.getElementById('app');
   let startX = 0, startY = 0, dragX = 0, dragY = 0, isDragging = false, lockAxis = null;
-  let dragStartScrollTop = 0;
+  let dragStartAtBottom = false;
 
   function getActiveGlass(){
     const activeSlide = track.children[current + 1];
@@ -546,7 +546,7 @@
     startX = x; startY = y; dragX = 0; dragY = 0;
     isDragging = true; lockAxis = null;
     const g = getActiveGlass();
-    dragStartScrollTop = g ? g.scrollTop : 0;
+    dragStartAtBottom = g ? (g.scrollHeight - g.scrollTop - g.clientHeight <= 2) : true;
     track.style.transition = 'none';
   }
   function dragMove(x, y){
@@ -572,8 +572,8 @@
       else if(dragX > threshold) goTo(current-1);
       else goTo(current);
     } else if(lockAxis === 'y'){
-      // 只有卡片本身已經捲到頂端時，往下拉才視為「開啟行事曆」的手勢
-      if(dragY > 70 && dragStartScrollTop <= 0){
+      // 只有卡片本身已經捲到底部時，往上滑才視為「開啟行事曆」的手勢
+      if(dragY < -70 && dragStartAtBottom){
         openCalendar();
       }
     }
@@ -623,12 +623,12 @@
 
   window.addEventListener('keydown', e=>{
     if(calOpen){
-      if(e.key === 'ArrowUp' || e.key === 'Escape') closeCalendar();
+      if(e.key === 'ArrowDown' || e.key === 'Escape') closeCalendar();
       return;
     }
     if(e.key==='ArrowRight') goTo(current+1);
     if(e.key==='ArrowLeft') goTo(current-1);
-    if(e.key==='ArrowDown') openCalendar();
+    if(e.key==='ArrowUp') openCalendar();
   });
 
   // 滑鼠滾輪翻頁（電腦版）；在最後一頁（照片牆）繼續往下滾，會開啟行事曆
@@ -765,7 +765,7 @@
   calHandle.addEventListener('click', ()=> window.openCalendar());
   calOverlay.addEventListener('click', e=>{ if(e.target === calOverlay) window.closeCalendar(); });
 
-  // 面板內往上滑可以關閉
+  // 面板內往下滑可以關閉（面板從底部滑出，往下滑是自然的收合方向）
   (function(){
     const sheet = document.getElementById('calSheet');
     let sy = 0, dy2 = 0, dragging2 = false;
@@ -776,7 +776,7 @@
     }, {passive:true});
     sheet.addEventListener('touchend', ()=>{
       dragging2 = false;
-      if(dy2 < -50 && sheet.scrollTop <= 0) window.closeCalendar();
+      if(dy2 > 50 && sheet.scrollTop <= 0) window.closeCalendar();
     });
   })();
 </script>
