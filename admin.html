@@ -68,9 +68,9 @@
     text-decoration:underline;
   }
 
-  .tabs{ display:flex; gap:8px; margin-bottom:18px; }
+  .tabs{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
   .tab{
-    flex:1; text-align:center; padding:10px 8px; border-radius:14px; font-size:12.5px; font-weight:700;
+    flex:1 1 30%; text-align:center; padding:10px 8px; border-radius:14px; font-size:12px; font-weight:700;
     background: var(--glass); border:1px solid var(--line); cursor:pointer; color:var(--muted);
     transition: all .2s var(--ease);
   }
@@ -123,6 +123,30 @@
   .photo-item img{ width:48px; height:48px; border-radius:10px; object-fit:cover; flex-shrink:0; }
   .photo-item .cap{ flex:1; font-size:12.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+  .avatar-item{
+    display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:16px;
+    background: var(--glass-strong); border:1px solid var(--line); margin-bottom:10px;
+  }
+  .avatar-item img{ width:48px; height:48px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+  .avatar-item .ai-info{ flex:1; min-width:0; }
+  .avatar-item .ai-artist{ font-size:12.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .avatar-item .ai-order{ font-size:10.5px; color:var(--muted); font-weight:600; }
+  .avatar-item .ai-btns{ display:flex; flex-direction:column; gap:4px; }
+  .mini-btn{
+    width:24px; height:20px; border-radius:6px; border:none; background: rgba(58,46,34,0.1);
+    color:var(--ink); font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .preview-thumb{ width:64px; height:64px; border-radius:14px; object-fit:cover; border:1px solid var(--line); }
+  .preview-audio{ width:100%; }
+  .fursona-item{
+    display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:16px;
+    background: var(--glass-strong); border:1px solid var(--line); margin-bottom:10px;
+  }
+  .fursona-item img{ width:48px; height:48px; border-radius:10px; object-fit:cover; flex-shrink:0; }
+  .fursona-item .fi-info{ flex:1; min-width:0; }
+  .fursona-item .fi-label{ font-size:12.5px; font-weight:700; }
+  .fursona-item .fi-order{ font-size:10.5px; color:var(--muted); font-weight:600; }
+
   .upload-zone{
     border: 1.5px dashed var(--line); border-radius:16px; padding:22px; text-align:center;
     color: var(--muted); font-size:12.5px; font-weight:600; cursor:pointer; margin-bottom:14px;
@@ -158,8 +182,10 @@
 
     <div class="tabs">
       <div class="tab active" data-tab="bio">自介</div>
+      <div class="tab" data-tab="avatar">頭貼</div>
       <div class="tab" data-tab="calendar">行事曆</div>
       <div class="tab" data-tab="gallery">照片牆</div>
+      <div class="tab" data-tab="settings">設定</div>
     </div>
 
     <!-- 自介 -->
@@ -172,6 +198,26 @@
           <button class="btn btn-primary" id="saveBioBtn">儲存自介</button>
           <span class="save-status" id="bioStatus">已儲存 ✓</span>
         </div>
+      </div>
+    </div>
+
+    <!-- 頭貼庫 -->
+    <div class="panel" id="panel-avatar">
+      <div class="card">
+        <h2>新增頭貼</h2>
+        <label class="upload-zone" id="avatarUploadZone">
+          🖼️ 點擊選擇頭貼圖片
+          <input type="file" id="avatarInput" accept="image/*">
+        </label>
+        <label>繪師（選填）</label>
+        <input type="text" id="avatarArtist" placeholder="這張頭貼是誰畫的">
+        <button class="btn btn-primary btn-block" id="avatarUploadBtn">加入頭貼庫</button>
+        <div class="spinner" id="avatarSpinner" style="display:none;">上傳中…</div>
+      </div>
+      <div class="card">
+        <h2>頭貼順序</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">網站會依照這個順序輪流顯示，點頭貼旁的箭頭可以調整先後。</p>
+        <div id="avatarList"><div class="empty">尚無頭貼</div></div>
       </div>
     </div>
 
@@ -212,6 +258,61 @@
       </div>
     </div>
 
+    <!-- 設定：Fursona 設定圖 + 彩蛋 -->
+    <div class="panel" id="panel-settings">
+      <div class="card">
+        <h2>Fursona 設定圖</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">新上傳的會排在原本紫色設定圖下方，「關於我」的設定圖方塊點開後會依序全部顯示。</p>
+        <label class="upload-zone" id="fursonaUploadZone">
+          🎨 點擊選擇設定圖
+          <input type="file" id="fursonaInput" accept="image/*">
+        </label>
+        <label>標籤（選填，例如「第二設定」）</label>
+        <input type="text" id="fursonaLabel" placeholder="這張設定圖的說明">
+        <button class="btn btn-primary btn-block" id="fursonaUploadBtn">加入設定圖</button>
+        <div class="spinner" id="fursonaSpinner" style="display:none;">上傳中…</div>
+      </div>
+      <div class="card">
+        <h2>目前設定圖</h2>
+        <div id="fursonaList"><div class="empty">尚無設定圖</div></div>
+      </div>
+
+      <div class="card">
+        <h2>彩蛋・一階頭貼</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">長按或連點頭貼 11 下觸發時，換上的頭貼圖片。</p>
+        <div id="eggAvatarPreview" style="margin-bottom:12px;"></div>
+        <label class="upload-zone" id="eggAvatarUploadZone">
+          🖼️ 選擇新的彩蛋頭貼
+          <input type="file" id="eggAvatarInput" accept="image/*">
+        </label>
+        <button class="btn btn-primary btn-block" id="eggAvatarSaveBtn">更新彩蛋頭貼</button>
+        <div class="spinner" id="eggAvatarSpinner" style="display:none;">上傳中…</div>
+      </div>
+
+      <div class="card">
+        <h2>彩蛋・一階音效</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">觸發彩蛋時播放的音效檔。</p>
+        <div id="eggSoundPreview" style="margin-bottom:12px;"></div>
+        <label class="upload-zone" id="eggSoundUploadZone">
+          🔊 選擇新的音效檔
+          <input type="file" id="eggSoundInput" accept="audio/*">
+        </label>
+        <button class="btn btn-primary btn-block" id="eggSoundSaveBtn">更新彩蛋音效</button>
+        <div class="spinner" id="eggSoundSpinner" style="display:none;">上傳中…</div>
+      </div>
+
+      <div class="card">
+        <h2>彩蛋・二階跳轉網址</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">一階彩蛋觸發後，再次長按/連點 11 下會跳轉到這個網址。</p>
+        <label>網址</label>
+        <input type="text" id="stage2UrlInput" placeholder="https://...">
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="stage2UrlSaveBtn">儲存網址</button>
+          <span class="save-status" id="stage2UrlStatus">已儲存 ✓</span>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -222,7 +323,7 @@
     getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, setDoc, collection, addDoc, deleteDoc, onSnapshot,
+    getFirestore, doc, getDoc, getDocs, setDoc, collection, addDoc, deleteDoc, onSnapshot,
     query, orderBy, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import {
@@ -239,8 +340,8 @@
     appId: "1:695308416375:web:2b3be5f7403ab323085d72"
   };
 
-  // ⚠️ 只有這個 UID 能登入管理後台（之後我們會一起去 Firebase 主控台複製你的 UID 貼在這裡）
-  const ALLOWED_UID = "PASTE_YOUR_UID_HERE";
+  // 只有這個 UID 能登入管理後台
+  const ALLOWED_UID = "x1gZPujgrYTVFX2bhxOdoG7WsJN2";
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
@@ -270,8 +371,11 @@
       document.getElementById('userAvatar').src = user.photoURL || '';
       document.getElementById('userName').textContent = user.displayName || user.email;
       initBio();
+      initAvatars();
       initCalendar();
       initGallery();
+      initFursonas();
+      initEggSettings();
     } else if(user){
       // 登入了但不是你本人
       loginError.style.display = 'block';
@@ -344,6 +448,89 @@
     };
   }
 
+  // ---------- 頭貼庫 ----------
+  function initAvatars(){
+    const colRef = collection(db, 'avatars');
+    const q = query(colRef, orderBy('order', 'asc'));
+
+    onSnapshot(q, (snap)=>{
+      const list = document.getElementById('avatarList');
+      if(snap.empty){ list.innerHTML = '<div class="empty">尚無頭貼</div>'; return; }
+      const docs = [];
+      snap.forEach(d=> docs.push({ id:d.id, ...d.data() }));
+
+      list.innerHTML = '';
+      docs.forEach((a, idx)=>{
+        const el = document.createElement('div');
+        el.className = 'avatar-item';
+        el.innerHTML = `
+          <img src="${a.imageUrl}" alt="">
+          <div class="ai-info">
+            <div class="ai-artist">${escapeHtml(a.artist || '（未標註繪師）')}</div>
+            <div class="ai-order">順序 ${idx + 1}</div>
+          </div>
+          <div class="ai-btns">
+            <button class="mini-btn" data-dir="up">▲</button>
+            <button class="mini-btn" data-dir="down">▼</button>
+          </div>
+          <button class="del-btn">✕</button>
+        `;
+        el.querySelector('[data-dir="up"]').addEventListener('click', ()=> swapOrder(docs, idx, idx-1));
+        el.querySelector('[data-dir="down"]').addEventListener('click', ()=> swapOrder(docs, idx, idx+1));
+        el.querySelector('.del-btn').addEventListener('click', async ()=>{
+          try{ if(a.storagePath) await deleteObject(ref(storage, a.storagePath)); }catch(e){}
+          await deleteDoc(doc(db,'avatars', a.id));
+        });
+        list.appendChild(el);
+      });
+    });
+
+    async function swapOrder(docs, i, j){
+      if(j < 0 || j >= docs.length) return;
+      const a = docs[i], b = docs[j];
+      const orderA = a.order, orderB = b.order;
+      await setDoc(doc(db,'avatars', a.id), { order: orderB }, { merge:true });
+      await setDoc(doc(db,'avatars', b.id), { order: orderA }, { merge:true });
+    }
+
+    let selectedAvatarFile = null;
+    document.getElementById('avatarInput').addEventListener('change', (e)=>{
+      selectedAvatarFile = e.target.files[0] || null;
+      document.getElementById('avatarUploadZone').textContent = selectedAvatarFile ? `已選擇：${selectedAvatarFile.name}` : '🖼️ 點擊選擇頭貼圖片';
+    });
+
+    document.getElementById('avatarUploadBtn').onclick = async ()=>{
+      if(!selectedAvatarFile) return;
+      const spinner = document.getElementById('avatarSpinner');
+      spinner.style.display = 'block';
+      try{
+        const snap = await getDocs(query(colRef, orderBy('order','desc')));
+        let maxOrder = 0;
+        snap.forEach(d=>{ const o = d.data().order || 0; if(o > maxOrder) maxOrder = o; });
+
+        const path = `avatars/${Date.now()}_${selectedAvatarFile.name}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, selectedAvatarFile);
+        const url = await getDownloadURL(sRef);
+        await addDoc(colRef, {
+          imageUrl: url,
+          storagePath: path,
+          artist: document.getElementById('avatarArtist').value.trim(),
+          order: maxOrder + 1,
+          uploadedAt: serverTimestamp()
+        });
+        document.getElementById('avatarArtist').value = '';
+        document.getElementById('avatarInput').value = '';
+        document.getElementById('avatarUploadZone').textContent = '🖼️ 點擊選擇頭貼圖片';
+        selectedAvatarFile = null;
+      }catch(err){
+        console.error(err);
+        alert('上傳失敗，請再試一次');
+      }
+      spinner.style.display = 'none';
+    };
+  }
+
   // ---------- 照片牆 ----------
   function initGallery(){
     const colRef = collection(db, 'gallery');
@@ -399,6 +586,161 @@
         alert('上傳失敗，請再試一次');
       }
       spinner.style.display = 'none';
+    };
+  }
+
+  // ---------- Fursona 設定圖 ----------
+  function initFursonas(){
+    const colRef = collection(db, 'fursonas');
+    const q = query(colRef, orderBy('order', 'asc'));
+
+    onSnapshot(q, (snap)=>{
+      const list = document.getElementById('fursonaList');
+      if(snap.empty){ list.innerHTML = '<div class="empty">尚無設定圖</div>'; return; }
+      const docs = [];
+      snap.forEach(d=> docs.push({ id:d.id, ...d.data() }));
+
+      list.innerHTML = '';
+      docs.forEach((f, idx)=>{
+        const el = document.createElement('div');
+        el.className = 'fursona-item';
+        el.innerHTML = `
+          <img src="${f.imageUrl}" alt="">
+          <div class="fi-info">
+            <div class="fi-label">${escapeHtml(f.label || (idx===0 ? '原始設定圖' : '（未命名）'))}</div>
+            <div class="fi-order">順序 ${idx + 1}</div>
+          </div>
+          <button class="del-btn">✕</button>
+        `;
+        el.querySelector('.del-btn').addEventListener('click', async ()=>{
+          try{ if(f.storagePath) await deleteObject(ref(storage, f.storagePath)); }catch(e){}
+          await deleteDoc(doc(db,'fursonas', f.id));
+        });
+        list.appendChild(el);
+      });
+    });
+
+    let selectedFursonaFile = null;
+    document.getElementById('fursonaInput').addEventListener('change', (e)=>{
+      selectedFursonaFile = e.target.files[0] || null;
+      document.getElementById('fursonaUploadZone').textContent = selectedFursonaFile ? `已選擇：${selectedFursonaFile.name}` : '🎨 點擊選擇設定圖';
+    });
+
+    document.getElementById('fursonaUploadBtn').onclick = async ()=>{
+      if(!selectedFursonaFile) return;
+      const spinner = document.getElementById('fursonaSpinner');
+      spinner.style.display = 'block';
+      try{
+        const snap = await getDocs(query(colRef, orderBy('order','desc')));
+        let maxOrder = 0;
+        snap.forEach(d=>{ const o = d.data().order || 0; if(o > maxOrder) maxOrder = o; });
+
+        const path = `fursonas/${Date.now()}_${selectedFursonaFile.name}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, selectedFursonaFile);
+        const url = await getDownloadURL(sRef);
+        await addDoc(colRef, {
+          imageUrl: url,
+          storagePath: path,
+          label: document.getElementById('fursonaLabel').value.trim(),
+          order: maxOrder + 1,
+          uploadedAt: serverTimestamp()
+        });
+        document.getElementById('fursonaLabel').value = '';
+        document.getElementById('fursonaInput').value = '';
+        document.getElementById('fursonaUploadZone').textContent = '🎨 點擊選擇設定圖';
+        selectedFursonaFile = null;
+      }catch(err){
+        console.error(err);
+        alert('上傳失敗，請再試一次');
+      }
+      spinner.style.display = 'none';
+    };
+  }
+
+  // ---------- 彩蛋設定 ----------
+  function initEggSettings(){
+    const settingsRef = doc(db, 'settings', 'easterEgg');
+
+    getDoc(settingsRef).then(snap=>{
+      const data = snap.exists() ? snap.data() : {};
+      renderEggPreview(data);
+      document.getElementById('stage2UrlInput').value = data.stage2Url || 'https://youtu.be/dQw4w9WgXcQ?si=Ba_6rd1HG80EjtXY';
+    });
+
+    function renderEggPreview(data){
+      const avatarPreview = document.getElementById('eggAvatarPreview');
+      avatarPreview.innerHTML = data.stage1AvatarUrl
+        ? `<img class="preview-thumb" src="${data.stage1AvatarUrl}" alt="">`
+        : `<span style="font-size:11.5px; color:var(--muted);">目前使用預設圖片</span>`;
+
+      const soundPreview = document.getElementById('eggSoundPreview');
+      soundPreview.innerHTML = data.stage1SoundUrl
+        ? `<audio class="preview-audio" controls src="${data.stage1SoundUrl}"></audio>`
+        : `<span style="font-size:11.5px; color:var(--muted);">目前使用預設音效</span>`;
+    }
+
+    let selectedEggAvatar = null;
+    document.getElementById('eggAvatarInput').addEventListener('change', (e)=>{
+      selectedEggAvatar = e.target.files[0] || null;
+      document.getElementById('eggAvatarUploadZone').textContent = selectedEggAvatar ? `已選擇：${selectedEggAvatar.name}` : '🖼️ 選擇新的彩蛋頭貼';
+    });
+    document.getElementById('eggAvatarSaveBtn').onclick = async ()=>{
+      if(!selectedEggAvatar) return;
+      const spinner = document.getElementById('eggAvatarSpinner');
+      spinner.style.display = 'block';
+      try{
+        const path = `egg/avatar_${Date.now()}_${selectedEggAvatar.name}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, selectedEggAvatar);
+        const url = await getDownloadURL(sRef);
+        await setDoc(settingsRef, { stage1AvatarUrl: url, updatedAt: serverTimestamp() }, { merge:true });
+        const snap = await getDoc(settingsRef);
+        renderEggPreview(snap.data());
+        document.getElementById('eggAvatarInput').value = '';
+        document.getElementById('eggAvatarUploadZone').textContent = '🖼️ 選擇新的彩蛋頭貼';
+        selectedEggAvatar = null;
+      }catch(err){
+        console.error(err);
+        alert('上傳失敗，請再試一次');
+      }
+      spinner.style.display = 'none';
+    };
+
+    let selectedEggSound = null;
+    document.getElementById('eggSoundInput').addEventListener('change', (e)=>{
+      selectedEggSound = e.target.files[0] || null;
+      document.getElementById('eggSoundUploadZone').textContent = selectedEggSound ? `已選擇：${selectedEggSound.name}` : '🔊 選擇新的音效檔';
+    });
+    document.getElementById('eggSoundSaveBtn').onclick = async ()=>{
+      if(!selectedEggSound) return;
+      const spinner = document.getElementById('eggSoundSpinner');
+      spinner.style.display = 'block';
+      try{
+        const path = `egg/sound_${Date.now()}_${selectedEggSound.name}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, selectedEggSound);
+        const url = await getDownloadURL(sRef);
+        await setDoc(settingsRef, { stage1SoundUrl: url, updatedAt: serverTimestamp() }, { merge:true });
+        const snap = await getDoc(settingsRef);
+        renderEggPreview(snap.data());
+        document.getElementById('eggSoundInput').value = '';
+        document.getElementById('eggSoundUploadZone').textContent = '🔊 選擇新的音效檔';
+        selectedEggSound = null;
+      }catch(err){
+        console.error(err);
+        alert('上傳失敗，請再試一次');
+      }
+      spinner.style.display = 'none';
+    };
+
+    document.getElementById('stage2UrlSaveBtn').onclick = async ()=>{
+      const url = document.getElementById('stage2UrlInput').value.trim();
+      if(!url) return;
+      await setDoc(settingsRef, { stage2Url: url, updatedAt: serverTimestamp() }, { merge:true });
+      const status = document.getElementById('stage2UrlStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
     };
   }
 
