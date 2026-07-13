@@ -68,11 +68,15 @@
 
   #p1 .glass, #p1clone .glass{ text-align:center; }
   .avatar{
-    width:92px; height:92px; border-radius:50%; margin:0 auto 20px;
+    width:92px; height:92px; border-radius:50%; margin:0 auto 8px;
     background: linear-gradient(135deg, var(--rust), var(--moss));
     padding:3px; cursor:pointer;
   }
-  .avatar img{ width:100%; height:100%; border-radius:50%; object-fit:cover; border:3px solid var(--glass-strong); display:block; pointer-events:none; }
+  .avatar img{
+    width:100%; height:100%; border-radius:50%; object-fit:cover; border:3px solid var(--glass-strong); display:block; pointer-events:none;
+    transition: opacity .25s ease;
+  }
+  .pfp-credit{ font-size:9.5px; color:var(--muted); font-weight:600; opacity:.7; margin-bottom:14px; min-height:12px; }
 
   .hello{ font-size:13px; color:var(--muted); font-weight:600; letter-spacing:.04em; }
 
@@ -203,6 +207,19 @@
     background: rgba(58,46,34,0.32);
     z-index:40; cursor:pointer;
   }
+  .cal-hint{
+    position:fixed; bottom:44px; left:0; right:0; text-align:center;
+    font-size:10.5px; font-weight:600; color:var(--muted); letter-spacing:.02em;
+    z-index:39; pointer-events:none; opacity:.75;
+  }
+  .cal-hint.desktop-hint{ display:none; }
+  .cal-hint.mobile-hint{ display:none; }
+  @media (hover:hover) and (pointer:fine){
+    .cal-hint.desktop-hint{ display:block; }
+  }
+  @media (pointer:coarse){
+    .cal-hint.mobile-hint{ display:block; }
+  }
   .cal-overlay{
     position:fixed; inset:0; z-index:70;
     background: rgba(58,46,34,0.28);
@@ -215,20 +232,23 @@
     backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
   }
   .cal-sheet{
-    position:absolute; bottom:0; left:0; right:0;
-    max-width:480px; margin:0 auto;
+    position:fixed; bottom:14px; left:14px; right:14px;
+    max-width:420px; margin:0 auto;
     background: var(--glass-strong);
-    border-top-left-radius:32px; border-top-right-radius:32px;
-    border:1px solid var(--line); border-bottom:none;
-    padding: 18px 24px calc(30px + env(safe-area-inset-bottom));
-    box-shadow: 0 -20px 50px -20px rgba(58,46,34,.4);
-    transform: translateY(100%);
+    backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-radius:30px;
+    border:1px solid var(--line);
+    padding: 18px 24px calc(24px + env(safe-area-inset-bottom));
+    box-shadow: 0 -10px 50px -10px rgba(58,46,34,.4), 0 20px 50px -20px rgba(58,46,34,.28);
+    height: 72dvh;
+    transform: translateY(calc(100% + 30px));
     transition: transform .48s var(--ease);
-    max-height: 84dvh; overflow-y:auto;
+    overflow-y:auto;
+    display:flex; flex-direction:column;
   }
   .cal-overlay.open .cal-sheet{ transform: translateY(0); }
   .cal-sheet::-webkit-scrollbar{ display:none; }
-  .cal-grabber{ width:36px; height:4px; border-radius:999px; background: rgba(58,46,34,0.22); margin:0 auto 16px; }
+  .cal-grabber{ width:36px; height:4px; border-radius:999px; background: rgba(58,46,34,0.22); margin:0 auto 16px; flex-shrink:0; }
 
   .cal-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
   .cal-month-label{ font-size:16px; font-weight:800; letter-spacing:-0.01em; }
@@ -288,6 +308,7 @@
       <div class="page" id="p1">
         <div class="glass">
           <div class="avatar" id="avatarWrap"><img id="avatarImg" src="images/avatar.png" alt="Julian"></div>
+          <div class="pfp-credit" id="pfpCredit"></div>
           <div class="hello">Hi, my name is</div>
           <div class="name">Julian</div>
           <div class="sub">紫毛狐狸 · 攝影師 · 快門自由</div>
@@ -406,6 +427,8 @@
 
   <!-- 行事曆拉柄與下滑面板 -->
   <div class="cal-handle" id="calHandle"></div>
+  <div class="cal-hint desktop-hint">↑ 打開行事曆 · ↓ 關閉</div>
+  <div class="cal-hint mobile-hint">上滑開啟行事曆</div>
   <div class="cal-overlay" id="calOverlay">
     <div class="cal-sheet" id="calSheet">
       <div class="cal-grabber"></div>
@@ -631,36 +654,31 @@
     if(e.key==='ArrowUp') openCalendar();
   });
 
-  // 滑鼠滾輪翻頁（電腦版）；在最後一頁（照片牆）繼續往下滾，會開啟行事曆
+  // 滑鼠滾輪翻頁（電腦版）；行事曆改由方向鍵控制，不再用滾輪觸發
   let wheelLock = false;
   app.addEventListener('wheel', e=>{
-    if(wheelLock || looping) return;
-    if(calOpen){
-      if(e.deltaY < -12){ wheelLock = true; closeCalendar(); setTimeout(()=>{ wheelLock=false; }, 650); }
-      return;
-    }
+    if(wheelLock || looping || calOpen) return;
     const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
     if(Math.abs(delta) < 12) return;
     wheelLock = true;
-    if(delta > 0){
-      if(current === total - 1) openCalendar();
-      else goTo(current+1);
-    } else {
-      goTo(current-1);
-    }
+    if(delta > 0) goTo(current+1); else goTo(current-1);
     setTimeout(()=>{ wheelLock = false; }, 650);
   }, {passive:true});
 
-  // ---------- 頭貼彩蛋 ----------
+  // ---------- 頭貼彩蛋 + 頭貼庫切換 ----------
   const avatarWrap = document.getElementById('avatarWrap');
   const avatarImg = document.getElementById('avatarImg');
   const eggAudio = document.getElementById('eggAudio');
   const subText = document.querySelector('#p1 .sub');
-  const ORIGINAL_AVATAR = 'images/avatar.png';
-  const EGG_AVATAR = 'images/avatar-easter-egg.png';
   const ORIGINAL_SUB = subText.textContent;
   const EGG_SUB = '(25歲，是個老人)';
-  const STAGE2_URL = 'https://youtu.be/dQw4w9WgXcQ?si=Ba_6rd1HG80EjtXY';
+
+  // 預設值，管理後台若有設定會自動覆蓋（見底部 Firebase 模組區塊）
+  window.eggConfig = window.eggConfig || {
+    avatar: 'images/avatar-easter-egg.png',
+    sound: 'audio/easter-egg.mp3',
+    stage2Url: 'https://youtu.be/dQw4w9WgXcQ?si=Ba_6rd1HG80EjtXY'
+  };
 
   let eggStage = 0;
   let pressTimer = null;
@@ -670,19 +688,19 @@
     if(eggStage !== 0) return;
     eggStage = 1;
     clickCount = 0;
-    avatarImg.src = EGG_AVATAR;
+    avatarImg.src = window.eggConfig.avatar;
     subText.textContent = EGG_SUB;
     try{ eggAudio.currentTime = 0; eggAudio.play(); }catch(err){}
   }
   function triggerStage2(){
     if(eggStage !== 1) return;
-    window.location.href = STAGE2_URL;
+    window.location.href = window.eggConfig.stage2Url;
   }
   function resetEgg(){
     eggStage = 0;
     clickCount = 0;
     clearTimeout(pressTimer);
-    avatarImg.src = ORIGINAL_AVATAR;
+    if(typeof window.restoreCurrentAvatar === 'function') window.restoreCurrentAvatar();
     subText.textContent = ORIGINAL_SUB;
   }
   function currentPressDuration(){
@@ -702,6 +720,9 @@
   }
   function handleClick(e){
     e.stopPropagation();
+    if(eggStage === 0 && typeof window.cycleAvatar === 'function'){
+      window.cycleAvatar();
+    }
     clickCount++;
     if(clickCount >= 11){
       clickCount = 0;
@@ -725,7 +746,19 @@
 音樂品味偏 60s~80s 西洋老歌與現代嘻哈，最愛 Kanye West。
 遊戲是 Xbox 玩家，Game Pass 有什麼玩什麼，maimai 摸摸仔。</div>`;
 
-  const REF_HTML = `<div class="modal-title">設定圖</div><img class="modal-img" src="images/reference-sheet.webp" alt="Julian 角色設定圖">`;
+  function buildFursonaHtml(){
+    const list = (window.fursonaList && window.fursonaList.length) ? window.fursonaList : null;
+    let html = `<div class="modal-title">設定圖</div>`;
+    if(list){
+      html += list.map(f => `
+        <img class="modal-img" src="${f.imageUrl}" alt="">
+        <div style="font-size:12px; color:var(--muted); font-weight:600; margin:6px 0 16px;">${f.label ? f.label.replace(/</g,'&lt;') : ''}</div>
+      `).join('');
+    } else {
+      html += `<img class="modal-img" src="images/reference-sheet.webp" alt="Julian 角色設定圖">`;
+    }
+    return html;
+  }
 
   const modalOverlay = document.getElementById('modalOverlay');
   const modalBody = document.getElementById('modalBody');
@@ -742,7 +775,7 @@
   modalOverlay.addEventListener('click', e=>{ if(e.target === modalOverlay) closeModal(); });
 
   document.getElementById('tileBio').addEventListener('click', ()=> openModal(BIO_HTML));
-  document.getElementById('tileRef').addEventListener('click', ()=> openModal(REF_HTML));
+  document.getElementById('tileRef').addEventListener('click', ()=> openModal(buildFursonaHtml()));
   document.getElementById('tileMusic').addEventListener('click', ()=> goTo(3));
   document.getElementById('tilePhoto').addEventListener('click', ()=> window.open('https://www.flickr.com/gp/204066960@N03/7K8j6DK20v', '_blank', 'noopener'));
 
@@ -783,7 +816,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
-  import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAfyM4g54lnJh3mQhJ3zU50U75mB_04MHk",
@@ -975,6 +1008,86 @@
     }
   }
   startGalleryListening();
+
+  /* ============ 頭貼庫（即時） ============ */
+  const avatarImgEl = document.getElementById('avatarImg');
+  const pfpCreditEl = document.getElementById('pfpCredit');
+  window.avatarLib = [];
+  window.avatarIndex = 0;
+
+  function applyAvatar(){
+    if(!window.avatarLib.length){
+      avatarImgEl.src = 'images/avatar.png';
+      pfpCreditEl.textContent = '';
+      return;
+    }
+    const a = window.avatarLib[window.avatarIndex % window.avatarLib.length];
+    avatarImgEl.style.opacity = '0';
+    setTimeout(()=>{
+      avatarImgEl.src = a.imageUrl;
+      pfpCreditEl.textContent = a.artist ? `PFP by ${a.artist}` : '';
+      avatarImgEl.style.opacity = '1';
+    }, 150);
+  }
+
+  window.cycleAvatar = function(){
+    if(!window.avatarLib.length) return;
+    window.avatarIndex = (window.avatarIndex + 1) % window.avatarLib.length;
+    applyAvatar();
+  };
+  window.restoreCurrentAvatar = function(){
+    applyAvatar();
+  };
+
+  try{
+    const avatarQ = query(collection(db, 'avatars'), orderBy('order', 'asc'));
+    onSnapshot(avatarQ, (snap)=>{
+      const list = [];
+      snap.forEach(d=> list.push(d.data()));
+      window.avatarLib = list;
+      if(window.avatarIndex >= list.length) window.avatarIndex = 0;
+      applyAvatar();
+    }, ()=>{ applyAvatar(); });
+  }catch(err){
+    applyAvatar();
+  }
+
+  /* ============ 彩蛋設定（即時） ============ */
+  window.eggConfig = window.eggConfig || {
+    avatar: 'images/avatar-easter-egg.png',
+    sound: 'audio/easter-egg.mp3',
+    stage2Url: 'https://youtu.be/dQw4w9WgXcQ?si=Ba_6rd1HG80EjtXY'
+  };
+  try{
+    onSnapshot(doc(db, 'settings', 'easterEgg'), (snap)=>{
+      if(!snap.exists()) return;
+      const d = snap.data();
+      if(d.stage1AvatarUrl) window.eggConfig.avatar = d.stage1AvatarUrl;
+      if(d.stage1SoundUrl){
+        window.eggConfig.sound = d.stage1SoundUrl;
+        const audioEl = document.getElementById('eggAudio');
+        if(audioEl) audioEl.src = d.stage1SoundUrl;
+      }
+      if(d.stage2Url) window.eggConfig.stage2Url = d.stage2Url;
+    });
+  }catch(err){}
+
+  /* ============ Fursona 設定圖（即時） ============ */
+  window.fursonaList = [];
+  try{
+    const fursonaQ = query(collection(db, 'fursonas'), orderBy('order', 'asc'));
+    onSnapshot(fursonaQ, (snap)=>{
+      const list = [];
+      snap.forEach(d=> list.push(d.data()));
+      window.fursonaList = list;
+      if(list.length){
+        const tileRef = document.getElementById('tileRef');
+        if(tileRef){
+          tileRef.style.backgroundImage = `linear-gradient(180deg, rgba(58,46,34,0) 40%, rgba(58,46,34,.55) 100%), url('${list[0].imageUrl}')`;
+        }
+      }
+    });
+  }catch(err){}
 
   function escapeHtml(str){
     const d = document.createElement('div');
