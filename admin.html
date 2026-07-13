@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>管理後台 · Julian</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#3A2E22; --muted:#8C7A63; --rust:#B85C34; --moss:#6E7A52;
+    --line: rgba(255,255,255,0.45);
+    --glass: rgba(255,251,242,0.55);
+    --glass-strong: rgba(255,251,242,0.75);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --danger:#B8453D;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ min-height:100%; }
+  body{
+    font-family:'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing:antialiased;
+    min-height:100dvh;
+    background:
+      radial-gradient(circle at 20% 20%, #E8B98A 0%, transparent 45%),
+      radial-gradient(circle at 85% 15%, #C97A55 0%, transparent 40%),
+      radial-gradient(circle at 75% 85%, #8A9668 0%, transparent 45%),
+      radial-gradient(circle at 10% 90%, #D9A05B 0%, transparent 40%),
+      #EFE4D2;
+    background-attachment: fixed;
+    padding: 28px 16px 60px;
+  }
+  .wrap{ max-width: 480px; margin: 0 auto; }
+
+  /* ---- 登入畫面 ---- */
+  #loginView{
+    min-height: 80dvh; display:flex; align-items:center; justify-content:center;
+  }
+  .login-card{
+    width:100%; max-width:360px; text-align:center;
+    background: var(--glass); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border:1px solid var(--line); border-radius:30px; padding:44px 30px;
+    box-shadow: 0 20px 50px -20px rgba(58,46,34,0.28);
+  }
+  .login-card h1{ font-size:22px; font-weight:800; margin-bottom:6px; letter-spacing:-0.01em; }
+  .login-card p{ font-size:13px; color:var(--muted); margin-bottom:28px; }
+  .google-btn{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; padding:13px; border-radius:14px; border:1px solid var(--line);
+    background: var(--glass-strong); color:var(--ink); font-weight:700; font-size:14px;
+    cursor:pointer; transition: transform .15s var(--ease);
+  }
+  .google-btn:active{ transform: scale(.97); }
+  .login-error{ margin-top:16px; font-size:12px; color:var(--danger); font-weight:600; display:none; }
+
+  /* ---- 主畫面 ---- */
+  #appView{ display:none; }
+  header.top{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;
+  }
+  header.top .who{ display:flex; align-items:center; gap:10px; }
+  header.top img{ width:34px; height:34px; border-radius:50%; }
+  header.top .name{ font-size:13.5px; font-weight:700; }
+  .logout-btn{
+    font-size:12px; font-weight:700; color:var(--muted); background:none; border:none; cursor:pointer;
+    text-decoration:underline;
+  }
+
+  .tabs{ display:flex; gap:8px; margin-bottom:18px; }
+  .tab{
+    flex:1; text-align:center; padding:10px 8px; border-radius:14px; font-size:12.5px; font-weight:700;
+    background: var(--glass); border:1px solid var(--line); cursor:pointer; color:var(--muted);
+    transition: all .2s var(--ease);
+  }
+  .tab.active{ background: var(--ink); color:#F6EEDF; border-color:var(--ink); }
+
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  .card{
+    background: var(--glass); backdrop-filter: blur(26px) saturate(170%); -webkit-backdrop-filter: blur(26px) saturate(170%);
+    border:1px solid var(--line); border-radius:24px; padding:22px 20px; margin-bottom:16px;
+    box-shadow: 0 12px 30px -16px rgba(58,46,34,0.22);
+  }
+  .card h2{ font-size:15px; font-weight:800; margin-bottom:14px; }
+
+  textarea, input[type="text"], input[type="date"]{
+    width:100%; font-family:inherit; font-size:13.5px; color:var(--ink);
+    background: var(--glass-strong); border:1px solid var(--line); border-radius:14px;
+    padding:12px 14px; resize:vertical;
+  }
+  textarea{ min-height:160px; line-height:1.7; }
+  label{ display:block; font-size:11.5px; font-weight:700; color:var(--muted); margin:12px 0 6px; }
+  label:first-child{ margin-top:0; }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:11px 18px; border-radius:14px; border:none; font-weight:700; font-size:13px;
+    cursor:pointer; transition: transform .15s var(--ease), opacity .15s ease;
+  }
+  .btn:active{ transform: scale(.96); }
+  .btn-primary{ background: var(--ink); color:#F6EEDF; }
+  .btn-danger{ background: rgba(184,69,61,0.12); color: var(--danger); }
+  .btn-block{ width:100%; margin-top:14px; }
+  .save-status{ font-size:11.5px; color:var(--moss); font-weight:700; margin-left:10px; opacity:0; transition: opacity .3s ease; }
+  .save-status.show{ opacity:1; }
+
+  .event-item, .photo-item{
+    display:flex; align-items:center; gap:12px; padding:12px; border-radius:16px;
+    background: var(--glass-strong); border:1px solid var(--line); margin-bottom:10px;
+  }
+  .event-item .info{ flex:1; min-width:0; }
+  .event-item .ttl{ font-size:13px; font-weight:700; }
+  .event-item .dt{ font-size:11px; color:var(--muted); font-weight:600; }
+  .event-item .desc{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .del-btn{
+    width:30px; height:30px; border-radius:50%; border:none; background: rgba(184,69,61,0.12); color:var(--danger);
+    font-size:14px; cursor:pointer; flex-shrink:0;
+  }
+
+  .photo-item img{ width:48px; height:48px; border-radius:10px; object-fit:cover; flex-shrink:0; }
+  .photo-item .cap{ flex:1; font-size:12.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .upload-zone{
+    border: 1.5px dashed var(--line); border-radius:16px; padding:22px; text-align:center;
+    color: var(--muted); font-size:12.5px; font-weight:600; cursor:pointer; margin-bottom:14px;
+    background: var(--glass-strong);
+  }
+  .upload-zone input{ display:none; }
+  .empty{ font-size:12px; color:var(--muted); text-align:center; padding:20px 0; }
+  .spinner{ font-size:12px; color:var(--muted); text-align:center; padding:10px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 登入畫面 -->
+  <div id="loginView">
+    <div class="login-card">
+      <h1>管理後台</h1>
+      <p>登入以編輯自介、行事曆與照片牆</p>
+      <button class="google-btn" id="googleLoginBtn">🔐 使用 Google 登入</button>
+      <div class="login-error" id="loginError">這個帳號沒有管理權限</div>
+    </div>
+  </div>
+
+  <!-- 主畫面 -->
+  <div id="appView">
+    <header class="top">
+      <div class="who">
+        <img id="userAvatar" src="" alt="">
+        <span class="name" id="userName"></span>
+      </div>
+      <button class="logout-btn" id="logoutBtn">登出</button>
+    </header>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="bio">自介</div>
+      <div class="tab" data-tab="calendar">行事曆</div>
+      <div class="tab" data-tab="gallery">照片牆</div>
+    </div>
+
+    <!-- 自介 -->
+    <div class="panel active" id="panel-bio">
+      <div class="card">
+        <h2>自介內容</h2>
+        <label>正文</label>
+        <textarea id="bioText" placeholder="嗨嗨，我是朱利安..."></textarea>
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="saveBioBtn">儲存自介</button>
+          <span class="save-status" id="bioStatus">已儲存 ✓</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 行事曆 -->
+    <div class="panel" id="panel-calendar">
+      <div class="card">
+        <h2>新增事件</h2>
+        <label>標題</label>
+        <input type="text" id="eventTitle" placeholder="例如：外拍活動">
+        <label>日期</label>
+        <input type="date" id="eventDate">
+        <label>描述（選填）</label>
+        <input type="text" id="eventDesc" placeholder="簡短說明">
+        <button class="btn btn-primary btn-block" id="addEventBtn">新增事件</button>
+      </div>
+      <div class="card">
+        <h2>目前事件</h2>
+        <div id="eventList"><div class="empty">尚無事件</div></div>
+      </div>
+    </div>
+
+    <!-- 照片牆 -->
+    <div class="panel" id="panel-gallery">
+      <div class="card">
+        <h2>上傳照片</h2>
+        <label class="upload-zone" id="uploadZone">
+          📷 點擊選擇照片上傳
+          <input type="file" id="photoInput" accept="image/*">
+        </label>
+        <label>圖說（選填）</label>
+        <input type="text" id="photoCaption" placeholder="這張照片的說明">
+        <button class="btn btn-primary btn-block" id="uploadBtn">確認上傳</button>
+        <div class="spinner" id="uploadSpinner" style="display:none;">上傳中…</div>
+      </div>
+      <div class="card">
+        <h2>目前照片</h2>
+        <div id="photoList"><div class="empty">尚無照片</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, collection, addDoc, deleteDoc, onSnapshot,
+    query, orderBy, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import {
+    getStorage, ref, uploadBytes, getDownloadURL, deleteObject
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
+
+  // ⚠️ 把這裡換成你自己 Firebase 專案的設定值
+  const firebaseConfig = {
+    apiKey: "AIzaSyAfyM4g54lnJh3mQhJ3zU50U75mB_04MHk",
+    authDomain: "julian-site-c5dd3.firebaseapp.com",
+    projectId: "julian-site-c5dd3",
+    storageBucket: "julian-site-c5dd3.firebasestorage.app",
+    messagingSenderId: "695308416375",
+    appId: "1:695308416375:web:2b3be5f7403ab323085d72"
+  };
+
+  // ⚠️ 只有這個 UID 能登入管理後台（之後我們會一起去 Firebase 主控台複製你的 UID 貼在這裡）
+  const ALLOWED_UID = "PASTE_YOUR_UID_HERE";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+  const provider = new GoogleAuthProvider();
+
+  const loginView = document.getElementById('loginView');
+  const appView = document.getElementById('appView');
+  const loginError = document.getElementById('loginError');
+
+  document.getElementById('googleLoginBtn').addEventListener('click', async ()=>{
+    loginError.style.display = 'none';
+    try{
+      await signInWithPopup(auth, provider);
+    }catch(err){
+      console.error(err);
+    }
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', ()=> signOut(auth));
+
+  onAuthStateChanged(auth, (user)=>{
+    if(user && (ALLOWED_UID === 'PASTE_YOUR_UID_HERE' || user.uid === ALLOWED_UID)){
+      loginView.style.display = 'none';
+      appView.style.display = 'block';
+      document.getElementById('userAvatar').src = user.photoURL || '';
+      document.getElementById('userName').textContent = user.displayName || user.email;
+      initBio();
+      initCalendar();
+      initGallery();
+    } else if(user){
+      // 登入了但不是你本人
+      loginError.style.display = 'block';
+      signOut(auth);
+    } else {
+      loginView.style.display = 'flex';
+      appView.style.display = 'none';
+    }
+  });
+
+  // ---------- 分頁切換 ----------
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(x=> x.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(x=> x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- 自介 ----------
+  function initBio(){
+    const bioRef = doc(db, 'profile', 'main');
+    getDoc(bioRef).then(snap=>{
+      if(snap.exists()) document.getElementById('bioText').value = snap.data().bio || '';
+    });
+    document.getElementById('saveBioBtn').onclick = async ()=>{
+      const bio = document.getElementById('bioText').value;
+      await setDoc(bioRef, { bio, updatedAt: serverTimestamp() });
+      const status = document.getElementById('bioStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+  }
+
+  // ---------- 行事曆 ----------
+  function initCalendar(){
+    const colRef = collection(db, 'calendar');
+    const q = query(colRef, orderBy('date', 'asc'));
+    onSnapshot(q, (snap)=>{
+      const list = document.getElementById('eventList');
+      if(snap.empty){ list.innerHTML = '<div class="empty">尚無事件</div>'; return; }
+      list.innerHTML = '';
+      snap.forEach(d=>{
+        const ev = d.data();
+        const el = document.createElement('div');
+        el.className = 'event-item';
+        el.innerHTML = `
+          <div class="info">
+            <div class="ttl">${escapeHtml(ev.title||'')}</div>
+            <div class="dt">${escapeHtml(ev.date||'')}</div>
+            ${ev.description ? `<div class="desc">${escapeHtml(ev.description)}</div>` : ''}
+          </div>
+          <button class="del-btn">✕</button>
+        `;
+        el.querySelector('.del-btn').addEventListener('click', ()=> deleteDoc(doc(db,'calendar', d.id)));
+        list.appendChild(el);
+      });
+    });
+
+    document.getElementById('addEventBtn').onclick = async ()=>{
+      const title = document.getElementById('eventTitle').value.trim();
+      const date = document.getElementById('eventDate').value;
+      const description = document.getElementById('eventDesc').value.trim();
+      if(!title || !date) return;
+      await addDoc(colRef, { title, date, description, createdAt: serverTimestamp() });
+      document.getElementById('eventTitle').value = '';
+      document.getElementById('eventDate').value = '';
+      document.getElementById('eventDesc').value = '';
+    };
+  }
+
+  // ---------- 照片牆 ----------
+  function initGallery(){
+    const colRef = collection(db, 'gallery');
+    const q = query(colRef, orderBy('uploadedAt', 'desc'));
+    onSnapshot(q, (snap)=>{
+      const list = document.getElementById('photoList');
+      if(snap.empty){ list.innerHTML = '<div class="empty">尚無照片</div>'; return; }
+      list.innerHTML = '';
+      snap.forEach(d=>{
+        const p = d.data();
+        const el = document.createElement('div');
+        el.className = 'photo-item';
+        el.innerHTML = `
+          <img src="${p.imageUrl}" alt="">
+          <div class="cap">${escapeHtml(p.caption || '（無說明）')}</div>
+          <button class="del-btn">✕</button>
+        `;
+        el.querySelector('.del-btn').addEventListener('click', async ()=>{
+          try{ if(p.storagePath) await deleteObject(ref(storage, p.storagePath)); }catch(e){}
+          await deleteDoc(doc(db,'gallery', d.id));
+        });
+        list.appendChild(el);
+      });
+    });
+
+    let selectedFile = null;
+    document.getElementById('photoInput').addEventListener('change', (e)=>{
+      selectedFile = e.target.files[0] || null;
+      document.getElementById('uploadZone').textContent = selectedFile ? `已選擇：${selectedFile.name}` : '📷 點擊選擇照片上傳';
+    });
+
+    document.getElementById('uploadBtn').onclick = async ()=>{
+      if(!selectedFile) return;
+      const spinner = document.getElementById('uploadSpinner');
+      spinner.style.display = 'block';
+      try{
+        const path = `gallery/${Date.now()}_${selectedFile.name}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, selectedFile);
+        const url = await getDownloadURL(sRef);
+        await addDoc(colRef, {
+          imageUrl: url,
+          storagePath: path,
+          caption: document.getElementById('photoCaption').value.trim(),
+          uploadedAt: serverTimestamp()
+        });
+        document.getElementById('photoCaption').value = '';
+        document.getElementById('photoInput').value = '';
+        document.getElementById('uploadZone').textContent = '📷 點擊選擇照片上傳';
+        selectedFile = null;
+      }catch(err){
+        console.error(err);
+        alert('上傳失敗，請再試一次');
+      }
+      spinner.style.display = 'none';
+    };
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+</script>
+</body>
+</html>
