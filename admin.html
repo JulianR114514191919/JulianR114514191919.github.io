@@ -191,6 +191,16 @@
     <!-- 自介 -->
     <div class="panel active" id="panel-bio">
       <div class="card">
+        <h2>首頁小描述</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">顯示在首頁名字下方的那行小字，例如「紫毛狐狸 · 攝影師 · 快門自由」。</p>
+        <label>內容</label>
+        <input type="text" id="subtitleText" placeholder="紫毛狐狸 · 攝影師 · 快門自由">
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="saveSubtitleBtn">儲存小描述</button>
+          <span class="save-status" id="subtitleStatus">已儲存 ✓</span>
+        </div>
+      </div>
+      <div class="card">
         <h2>自介內容</h2>
         <label>正文</label>
         <textarea id="bioText" placeholder="嗨嗨，我是朱利安..."></textarea>
@@ -311,6 +321,34 @@
           <span class="save-status" id="stage2UrlStatus">已儲存 ✓</span>
         </div>
       </div>
+
+      <div class="card">
+        <h2>「私心歌單」彈出視窗</h2>
+        <label>標題</label>
+        <input type="text" id="musicTitleInput" placeholder="私心歌單">
+        <label>說明文字</label>
+        <input type="text" id="musicDescInput" placeholder="最近單曲循環的清單...">
+        <label>Spotify 歌單網址</label>
+        <input type="text" id="musicUrlInput" placeholder="https://open.spotify.com/playlist/...">
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="musicSaveBtn">儲存</button>
+          <span class="save-status" id="musicStatus">已儲存 ✓</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>「攝影作品」確認視窗</h2>
+        <label>標題</label>
+        <input type="text" id="photoTitleInput" placeholder="要前往 Flickr 嗎？">
+        <label>說明文字</label>
+        <input type="text" id="photoDescInput" placeholder="即將離開這個網站...">
+        <label>Flickr 相簿網址</label>
+        <input type="text" id="photoUrlInput" placeholder="https://www.flickr.com/...">
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="photoSaveBtn">儲存</button>
+          <span class="save-status" id="photoStatus">已儲存 ✓</span>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -376,6 +414,7 @@
       initGallery();
       initFursonas();
       initEggSettings();
+      initAboutModals();
     } else if(user){
       // 登入了但不是你本人
       loginError.style.display = 'block';
@@ -396,16 +435,25 @@
     });
   });
 
-  // ---------- 自介 ----------
+  // ---------- 自介 + 首頁小描述 ----------
   function initBio(){
     const bioRef = doc(db, 'profile', 'main');
     getDoc(bioRef).then(snap=>{
-      if(snap.exists()) document.getElementById('bioText').value = snap.data().bio || '';
+      const data = snap.exists() ? snap.data() : {};
+      document.getElementById('bioText').value = data.bio || '';
+      document.getElementById('subtitleText').value = data.subtitle || '';
     });
     document.getElementById('saveBioBtn').onclick = async ()=>{
       const bio = document.getElementById('bioText').value;
-      await setDoc(bioRef, { bio, updatedAt: serverTimestamp() });
+      await setDoc(bioRef, { bio, updatedAt: serverTimestamp() }, { merge:true });
       const status = document.getElementById('bioStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+    document.getElementById('saveSubtitleBtn').onclick = async ()=>{
+      const subtitle = document.getElementById('subtitleText').value;
+      await setDoc(bioRef, { subtitle, updatedAt: serverTimestamp() }, { merge:true });
+      const status = document.getElementById('subtitleStatus');
       status.classList.add('show');
       setTimeout(()=> status.classList.remove('show'), 2000);
     };
@@ -739,6 +787,44 @@
       if(!url) return;
       await setDoc(settingsRef, { stage2Url: url, updatedAt: serverTimestamp() }, { merge:true });
       const status = document.getElementById('stage2UrlStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+  }
+
+  // ---------- 關於我彈出視窗文字 ----------
+  function initAboutModals(){
+    const ref2 = doc(db, 'settings', 'aboutModals');
+    getDoc(ref2).then(snap=>{
+      const d = snap.exists() ? snap.data() : {};
+      document.getElementById('musicTitleInput').value = d.musicTitle || '';
+      document.getElementById('musicDescInput').value = d.musicDesc || '';
+      document.getElementById('musicUrlInput').value = d.musicUrl || '';
+      document.getElementById('photoTitleInput').value = d.photoTitle || '';
+      document.getElementById('photoDescInput').value = d.photoDesc || '';
+      document.getElementById('photoUrlInput').value = d.photoUrl || '';
+    });
+
+    document.getElementById('musicSaveBtn').onclick = async ()=>{
+      await setDoc(ref2, {
+        musicTitle: document.getElementById('musicTitleInput').value.trim(),
+        musicDesc: document.getElementById('musicDescInput').value.trim(),
+        musicUrl: document.getElementById('musicUrlInput').value.trim(),
+        updatedAt: serverTimestamp()
+      }, { merge:true });
+      const status = document.getElementById('musicStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+
+    document.getElementById('photoSaveBtn').onclick = async ()=>{
+      await setDoc(ref2, {
+        photoTitle: document.getElementById('photoTitleInput').value.trim(),
+        photoDesc: document.getElementById('photoDescInput').value.trim(),
+        photoUrl: document.getElementById('photoUrlInput').value.trim(),
+        updatedAt: serverTimestamp()
+      }, { merge:true });
+      const status = document.getElementById('photoStatus');
       status.classList.add('show');
       setTimeout(()=> status.classList.remove('show'), 2000);
     };
