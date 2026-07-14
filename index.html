@@ -36,9 +36,9 @@
 
   .app{ position:relative; height:100dvh; width:100%; overflow:hidden; z-index:1; }
 
-  /* 7 格： p5複製 + p1 + p2 + p3 + p4 + p5 + p1複製 → 雙向無縫循環 */
-  .track{ display:flex; height:100%; width:700%; transition: transform .55s var(--ease); }
-  .page{ width:14.2857%; height:100%; display:flex; align-items:center; justify-content:center; padding: 28px 20px 90px; }
+  /* 6 格： p4複製 + p1 + p2 + p3 + p4 + p1複製 → 雙向無縫循環 */
+  .track{ display:flex; height:100%; width:600%; transition: transform .55s var(--ease); }
+  .page{ width:16.6667%; height:100%; display:flex; align-items:center; justify-content:center; padding: 28px 20px 90px; }
 
   .glass{
     width:100%; max-width:420px;
@@ -104,7 +104,18 @@
   .nowplaying .meta .t3{ font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .nowplaying-wrap{ width:100%; }
   .np-label{ font-size:10.5px; color:var(--muted); font-weight:700; letter-spacing:.05em; margin-bottom:6px; text-align:left; }
-  .np-img{ width:100%; max-width:100%; border-radius:18px; display:block; box-shadow:0 8px 20px -6px rgba(58,46,34,0.25); }
+  .np-img{
+    width:100%; max-width:100%; border-radius:18px; display:block;
+    box-shadow:0 8px 20px -6px rgba(58,46,34,0.25);
+    opacity:0; transition: opacity .4s ease;
+  }
+  .np-skeleton{
+    width:100%; height:64px; border-radius:18px;
+    background: linear-gradient(90deg, var(--glass-strong) 25%, rgba(255,255,255,0.75) 50%, var(--glass-strong) 75%);
+    background-size: 200% 100%;
+    animation: skeletonPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes skeletonPulse{ 0%{ background-position:200% 0; } 100%{ background-position:-200% 0; } }
 
   .hint{ margin-top:18px; font-size:10px; color:var(--muted); opacity:.55; letter-spacing:.01em; }
 
@@ -146,10 +157,6 @@
   .links .ic{ width:30px; height:30px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:15px; background:linear-gradient(135deg,var(--rust),var(--moss)); color:#fff; flex-shrink:0; }
 
   /* ---------- 歌單頁 ---------- */
-  .playlist-sub{ font-size:12.5px; color:var(--muted); margin-bottom:18px; font-weight:500; line-height:1.6; }
-  .playlist-embed{ border-radius:16px; overflow:hidden; border:1px solid var(--line); }
-  .playlist-embed iframe{ display:block; width:100%; }
-
   .gallery-note{ font-size:12px; color:var(--muted); margin-bottom:14px; text-align:left; line-height:1.6; font-weight:500; flex-shrink:0; }
   .masonry{ column-count:2; column-gap:10px; }
   .pin{
@@ -296,8 +303,8 @@
   <div class="app" id="app">
     <div class="track" id="track">
 
-      <!-- 複製的 P5（照片牆），放最前面用於反向無縫循環 -->
-      <div class="page" id="p5clone">
+      <!-- 複製的 P4（照片牆），放最前面用於反向無縫循環 -->
+      <div class="page" id="p4clone">
         <div class="glass top">
           <div class="h2">照片牆</div>
           <div class="masonry" id="masonryClone"></div>
@@ -319,9 +326,11 @@
           </div>
           <div class="nowplaying-wrap">
             <div class="np-label">🎧 目前在聽</div>
-            <img id="npImg" class="np-img" alt="Spotify Now Playing"
+            <div class="np-skeleton" id="npSkeleton"></div>
+            <img id="npImg" class="np-img" alt="Spotify Now Playing" style="display:none;"
                  src="https://novatorem-39a6-nine.vercel.app/api"
-                 onerror="this.style.display='none'; document.getElementById('npFallback').style.display='flex';">
+                 onload="this.style.display='block'; document.getElementById('npSkeleton').style.display='none'; requestAnimationFrame(()=>{ this.style.opacity='1'; });"
+                 onerror="document.getElementById('npSkeleton').style.display='none'; document.getElementById('npFallback').style.display='flex';">
             <div class="nowplaying" id="npFallback" style="display:none;">
               <div class="cover">🎵</div>
               <div class="meta">
@@ -353,7 +362,7 @@
             <div class="about-tile" id="tileMusic">
               <div class="ic">🎧</div>
               <div class="tt">私心歌單</div>
-              <div class="dd">點擊前往歌單頁</div>
+              <div class="dd">點擊聽聽看</div>
             </div>
             <div class="about-tile" id="tilePhoto">
               <div class="ic">📷</div>
@@ -378,20 +387,8 @@
         </div>
       </div>
 
-      <!-- P4 私心歌單 -->
+      <!-- P4 照片牆 -->
       <div class="page" id="p4">
-        <div class="glass">
-          <div class="h2">私心歌單</div>
-          <div class="playlist-sub">最近單曲循環的清單，60s-80s 老歌配現代嘻哈，開車兜風必備。</div>
-          <div class="playlist-embed">
-            <iframe src="https://open.spotify.com/embed/playlist/2gATEirHEhc8MiQpE2MBGS?utm_source=generator&theme=0"
-              width="100%" height="352" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
-          </div>
-        </div>
-      </div>
-
-      <!-- P5 照片牆 -->
-      <div class="page" id="p5">
         <div class="glass top">
           <div class="h2">照片牆</div>
           <div class="masonry" id="masonryMain"></div>
@@ -422,7 +419,6 @@
     <div class="dot" data-i="1"></div>
     <div class="dot" data-i="2"></div>
     <div class="dot" data-i="3"></div>
-    <div class="dot" data-i="4"></div>
   </div>
 
   <!-- 行事曆拉柄與下滑面板 -->
@@ -458,11 +454,12 @@
   const track = document.getElementById('track');
   const dots = document.querySelectorAll('.dot');
   const allGlass = document.querySelectorAll('.glass');
-  const realPages = document.querySelectorAll('#p1 .glass, #p2 .glass, #p3 .glass, #p4 .glass, #p5 .glass');
+  const realPages = document.querySelectorAll('#p1 .glass, #p2 .glass, #p3 .glass, #p4 .glass');
   let current = 0;
-  const total = 5;            // 真實頁數 (p1~p5)
-  const SLIDE = 100/7;        // 每格佔軌道百分比（共 7 格：p5複製+5頁+p1複製）
+  const total = 4;            // 真實頁數 (p1~p4)
+  const SLIDE = 100/6;        // 每格佔軌道百分比（共 6 格：p4複製+4頁+p1複製）
   let looping = false;
+  const enteredPages = new Set([0]); // 第一頁在畫面載入時就已經自動播過一次進場動畫了
 
   function playCardFrost(){
     allGlass.forEach(g=>{
@@ -473,12 +470,18 @@
   }
 
   function replayEntrance(i){
+    // 資料層的重置（跟彩蛋狀態有關），這個每次回到第一頁都要做，跟動畫無關
+    if(i === 0 && typeof resetEgg === 'function') resetEgg();
+
+    // 進場動畫只在「第一次」進入該頁時播放一次，之後翻頁回來不再重播
+    if(enteredPages.has(i)) return;
+    enteredPages.add(i);
+
     const g = realPages[i];
     g.style.animation = 'none';
     void g.offsetWidth;
     g.style.animation = '';
     if(i === 0){
-      if(typeof resetEgg === 'function') resetEgg();
       const n = document.querySelector('#p1 .name');
       n.style.animation = 'none';
       void n.offsetWidth;
@@ -494,7 +497,7 @@
     dots.forEach((d,idx)=> d.classList.toggle('active', idx===i));
   }
 
-  // 軌道位移： slide index = current + 1（因為最前面多了一格 p5複製）
+  // 軌道位移： slide index = current + 1（因為最前面多了一格 p4複製）
   function applyTransform(){
     track.style.transform = `translateX(-${(current+1) * SLIDE}%)`;
   }
@@ -537,7 +540,7 @@
     if(typeof resetEgg === 'function') resetEgg();
     playCardFrost();
     track.style.transition = '';
-    track.style.transform = `translateX(0%)`; // 滑到最前端複製的 p5
+    track.style.transform = `translateX(0%)`; // 滑到最前端複製的 p4
     setDot(total-1);
     const onEnd = (ev)=>{
       if(ev.propertyName !== 'transform') return;
@@ -746,6 +749,25 @@
 音樂品味偏 60s~80s 西洋老歌與現代嘻哈，最愛 Kanye West。
 遊戲是 Xbox 玩家，Game Pass 有什麼玩什麼，maimai 摸摸仔。</div>`;
 
+  const MUSIC_HTML = `
+    <div class="modal-title">私心歌單</div>
+    <div style="font-size:12.5px; color:var(--muted); font-weight:500; line-height:1.6; margin-bottom:14px;">最近單曲循環的清單，60s-80s 老歌配現代嘻哈，開車兜風必備。</div>
+    <div style="border-radius:16px; overflow:hidden; border:1px solid var(--line);">
+      <iframe src="https://open.spotify.com/embed/playlist/2gATEirHEhc8MiQpE2MBGS?utm_source=generator&theme=0"
+        width="100%" height="352" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    </div>
+  `;
+
+  const FLICKR_URL = 'https://www.flickr.com/gp/204066960@N03/7K8j6DK20v';
+  const FLICKR_CONFIRM_HTML = `
+    <div class="modal-title">要前往 Flickr 嗎？</div>
+    <div style="font-size:13px; color:var(--ink); line-height:1.7; margin-bottom:20px;">即將離開這個網站，跳轉到 Flickr 查看完整攝影作品相簿。</div>
+    <div style="display:flex; gap:10px;">
+      <button id="flickrStayBtn" style="flex:1; padding:12px; border-radius:14px; border:1px solid var(--line); background:transparent; color:var(--ink); font-weight:700; font-size:13.5px; cursor:pointer;">留下</button>
+      <button id="flickrGoBtn" style="flex:1; padding:12px; border-radius:14px; border:none; background:var(--ink); color:#F6EEDF; font-weight:700; font-size:13.5px; cursor:pointer;">確認前往</button>
+    </div>
+  `;
+
   function buildFursonaHtml(){
     const list = (window.fursonaList && window.fursonaList.length) ? window.fursonaList : null;
     let html = `<div class="modal-title">設定圖</div>`;
@@ -776,8 +798,15 @@
 
   document.getElementById('tileBio').addEventListener('click', ()=> openModal(BIO_HTML));
   document.getElementById('tileRef').addEventListener('click', ()=> openModal(buildFursonaHtml()));
-  document.getElementById('tileMusic').addEventListener('click', ()=> goTo(3));
-  document.getElementById('tilePhoto').addEventListener('click', ()=> window.open('https://www.flickr.com/gp/204066960@N03/7K8j6DK20v', '_blank', 'noopener'));
+  document.getElementById('tileMusic').addEventListener('click', ()=> openModal(MUSIC_HTML));
+  document.getElementById('tilePhoto').addEventListener('click', ()=>{
+    openModal(FLICKR_CONFIRM_HTML);
+    document.getElementById('flickrStayBtn').addEventListener('click', closeModal);
+    document.getElementById('flickrGoBtn').addEventListener('click', ()=>{
+      window.open(FLICKR_URL, '_blank', 'noopener');
+      closeModal();
+    });
+  });
 
   // ---------- 行事曆下滑面板：開關邏輯 ----------
   window.calOpen = false;
