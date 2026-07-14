@@ -6,6 +6,10 @@
 <title>Julian</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://novatorem-39a6-nine.vercel.app">
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link rel="preconnect" href="https://firebasestorage.googleapis.com">
+<link rel="dns-prefetch" href="https://novatorem-39a6-nine.vercel.app">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -37,7 +41,7 @@
   .app{ position:relative; height:100dvh; width:100%; overflow:hidden; z-index:1; }
 
   /* 6 格： p4複製 + p1 + p2 + p3 + p4 + p1複製 → 雙向無縫循環 */
-  .track{ display:flex; height:100%; width:600%; transition: transform .55s var(--ease); }
+  .track{ display:flex; height:100%; width:600%; transition: transform .55s var(--ease); will-change: transform; }
   .page{ width:16.6667%; height:100%; display:flex; align-items:center; justify-content:center; padding: 28px 20px 90px; }
 
   .glass{
@@ -53,6 +57,8 @@
     overflow-y: auto;
     display:flex; flex-direction:column; justify-content:center;
     animation: rise .6s var(--ease) both;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
   .glass.top{ justify-content:flex-start; }
   .glass.fill{ justify-content:stretch; }
@@ -60,11 +66,11 @@
   .glass::-webkit-scrollbar{ display:none; }
 
   @keyframes cardfrost{
-    0%{ filter: blur(0px); }
-    45%{ filter: blur(3.5px); }
-    100%{ filter: blur(0px); }
+    0%{ opacity:1; transform:scale(1); }
+    45%{ opacity:.88; transform:scale(.992); }
+    100%{ opacity:1; transform:scale(1); }
   }
-  .glass.frosting{ animation: cardfrost .38s ease; }
+  .glass.frosting{ animation: cardfrost .32s ease; will-change: opacity, transform; }
 
   #p1 .glass, #p1clone .glass{ text-align:center; }
   .avatar{
@@ -104,11 +110,35 @@
   .nowplaying .meta .t3{ font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .nowplaying-wrap{ width:100%; }
   .np-label{ font-size:10.5px; color:var(--muted); font-weight:700; letter-spacing:.05em; margin-bottom:6px; text-align:left; }
-  .np-img{
-    width:100%; max-width:100%; border-radius:18px; display:block;
-    box-shadow:0 8px 20px -6px rgba(58,46,34,0.25);
-    opacity:0; transition: opacity .4s ease;
+
+  .np-card2{
+    display:flex; gap:12px; align-items:center;
+    background: var(--glass-strong); border:1px solid var(--line);
+    border-radius:18px; padding:12px 14px; text-align:left;
   }
+  .np-art-wrap{ position:relative; width:52px; height:52px; flex-shrink:0; border-radius:12px; overflow:hidden; background: var(--glass); }
+  .np-art{ width:100%; height:100%; object-fit:cover; display:block; }
+  .np-pause-badge{
+    position:absolute; inset:0; background:rgba(58,46,34,0.4); border-radius:12px;
+    display:none; align-items:center; justify-content:center; color:#fff; font-size:16px;
+  }
+  .np-info2{ flex:1; min-width:0; }
+  .np-title2{ font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .np-artist2{ font-size:11.5px; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+  .np-progress-row{ display:flex; align-items:center; gap:6px; margin-top:6px; }
+  .np-time{ font-size:9px; color:var(--muted); font-weight:700; flex-shrink:0; min-width:24px; }
+  .np-time.right{ text-align:right; }
+  .np-track{ flex:1; height:3px; border-radius:2px; background:rgba(58,46,34,0.15); overflow:hidden; }
+  .np-fill{ height:100%; width:0%; background:linear-gradient(90deg,var(--rust),var(--moss)); border-radius:2px; }
+
+  .np-listen-btn{
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    margin-top:10px; padding:10px; border-radius:14px;
+    background: var(--ink); color:#F6EEDF; font-weight:700; font-size:12.5px;
+    text-decoration:none;
+  }
+  .np-listen-btn .dot{ width:7px; height:7px; border-radius:50%; background:#1DB954; flex-shrink:0; }
+
   .np-skeleton{
     width:100%; height:64px; border-radius:18px;
     background: linear-gradient(90deg, var(--glass-strong) 25%, rgba(255,255,255,0.75) 50%, var(--glass-strong) 75%);
@@ -138,10 +168,11 @@
   .about-tile .tt{ font-size:13px; font-weight:800; }
   .about-tile .dd{ font-size:10px; color:var(--muted); font-weight:600; margin-top:2px; }
   .about-tile.ref{
-    background-image: linear-gradient(180deg, rgba(58,46,34,0) 40%, rgba(58,46,34,.55) 100%), url('images/reference-sheet.webp');
+    background-color: var(--glass-strong);
     background-size: cover; background-position: center 20%;
   }
-  .about-tile.ref .tt, .about-tile.ref .dd{ color:#F6EEDF; }
+  .about-tile.ref.has-img{ background-image: linear-gradient(180deg, rgba(58,46,34,0) 40%, rgba(58,46,34,.55) 100%); }
+  .about-tile.ref.has-img .tt, .about-tile.ref.has-img .dd{ color:#F6EEDF; }
 
   .bio{ font-size:13.6px; line-height:1.9; color:var(--ink); text-align:left; white-space:pre-line; font-weight:450; }
 
@@ -298,7 +329,7 @@
   <div class="blob blob1"></div>
   <div class="blob blob2"></div>
 
-  <audio id="eggAudio" src="audio/easter-egg.mp3" preload="auto"></audio>
+  <audio id="eggAudio" preload="auto"></audio>
 
   <div class="app" id="app">
     <div class="track" id="track">
@@ -314,29 +345,43 @@
       <!-- P1 Hello -->
       <div class="page" id="p1">
         <div class="glass">
-          <div class="avatar" id="avatarWrap"><img id="avatarImg" src="images/avatar.png" alt="Julian"></div>
+          <div class="avatar" id="avatarWrap"><img id="avatarImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23E8DCC8'/%3E%3C/svg%3E" alt="Julian" fetchpriority="high"></div>
           <div class="pfp-credit" id="pfpCredit"></div>
           <div class="hello">Hi, my name is</div>
           <div class="name">Julian</div>
-          <div class="sub">紫毛狐狸想成為攝影師</div>
+          <div class="sub" id="subText"></div>
           <div class="tags">
             <span class="tag accent">🦊 Fox</span>
             <span class="tag">INFP</span>
             <span class="tag">Anemoia</span>
           </div>
           <div class="nowplaying-wrap">
-            <div class="np-label">🎧 目前在聽</div>
+            <div class="np-label" id="npLabel">🎧 目前在聽</div>
             <div class="np-skeleton" id="npSkeleton"></div>
-            <img id="npImg" class="np-img" alt="Spotify Now Playing" style="display:none;"
-                 src="https://novatorem-39a6-nine.vercel.app/api"
-                 onload="this.style.display='block'; document.getElementById('npSkeleton').style.display='none'; requestAnimationFrame(()=>{ this.style.opacity='1'; });"
-                 onerror="document.getElementById('npSkeleton').style.display='none'; document.getElementById('npFallback').style.display='flex';">
+            <div class="np-card2" id="npCard2" style="display:none;">
+              <div class="np-art-wrap">
+                <img class="np-art" id="npArt" src="" alt="">
+                <div class="np-pause-badge" id="npPauseBadge">⏸</div>
+              </div>
+              <div class="np-info2">
+                <div class="np-title2" id="npTitle2">—</div>
+                <div class="np-artist2" id="npArtist2">—</div>
+                <div class="np-progress-row">
+                  <span class="np-time" id="npElapsed">0:00</span>
+                  <div class="np-track"><div class="np-fill" id="npFill"></div></div>
+                  <span class="np-time right" id="npDuration">0:00</span>
+                </div>
+              </div>
+            </div>
+            <a class="np-listen-btn" id="npListenBtn" href="#" target="_blank" rel="noopener" style="display:none;">
+              <span class="dot"></span> 在 Spotify 聽
+            </a>
             <div class="nowplaying" id="npFallback" style="display:none;">
               <div class="cover">🎵</div>
               <div class="meta">
                 <div class="t1">Now Playing</div>
-                <div class="t2">尚未連接</div>
-                <div class="t3">設定 Vercel 網址後即可顯示</div>
+                <div class="t2">目前沒有播放</div>
+                <div class="t3">打開 Spotify 播放歌曲試試</div>
               </div>
             </div>
           </div>
@@ -361,12 +406,12 @@
             </div>
             <div class="about-tile" id="tileMusic">
               <div class="ic">🎧</div>
-              <div class="tt">最愛歌單</div>
-              <div class="dd">點擊查看歌單</div>
+              <div class="tt">私心歌單</div>
+              <div class="dd">點擊聽聽看</div>
             </div>
             <div class="about-tile" id="tilePhoto">
               <div class="ic">📷</div>
-              <div class="tt">攝影成品</div>
+              <div class="tt">攝影作品</div>
               <div class="dd">前往 Flickr 相簿</div>
             </div>
           </div>
@@ -399,14 +444,29 @@
       <!-- 複製的 P1，放最後面用於正向無縫循環 -->
       <div class="page" id="p1clone">
         <div class="glass">
-          <div class="avatar"><img src="images/avatar.png" alt="Julian"></div>
+          <div class="avatar"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23E8DCC8'/%3E%3C/svg%3E" alt="Julian"></div>
           <div class="hello">Hi, my name is</div>
           <div class="name" style="animation:none; opacity:1; transform:none; filter:none;">Julian</div>
-          <div class="sub">紫毛狐狸想成為攝影師</div>
+          <div class="sub" id="subTextClone"></div>
           <div class="tags">
             <span class="tag accent">🦊 Fox</span>
             <span class="tag">INFP</span>
             <span class="tag">Anemoia</span>
+          </div>
+          <div class="nowplaying-wrap">
+            <div class="np-label">🎧 目前在聽</div>
+            <div class="np-card2">
+              <div class="np-art-wrap"><div class="np-pause-badge" style="display:flex;">🎵</div></div>
+              <div class="np-info2">
+                <div class="np-title2">—</div>
+                <div class="np-artist2">—</div>
+                <div class="np-progress-row">
+                  <span class="np-time">0:00</span>
+                  <div class="np-track"><div class="np-fill"></div></div>
+                  <span class="np-time right">0:00</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -672,14 +732,17 @@
   const avatarWrap = document.getElementById('avatarWrap');
   const avatarImg = document.getElementById('avatarImg');
   const eggAudio = document.getElementById('eggAudio');
-  const subText = document.querySelector('#p1 .sub');
-  const ORIGINAL_SUB = subText.textContent;
+  const subText = document.getElementById('subText');
   const EGG_SUB = '(25歲，是個老人)';
+
+  // 首頁小描述改由 Firebase 提供，這裡先放空字串，等後台資料載入後會自動填入
+  window.currentSubtitle = window.currentSubtitle || '';
+  window.eggStage = 0;
 
   // 預設值，管理後台若有設定會自動覆蓋（見底部 Firebase 模組區塊）
   window.eggConfig = window.eggConfig || {
-    avatar: 'images/avatar-easter-egg.png',
-    sound: 'audio/easter-egg.mp3',
+    avatar: '',
+    sound: '',
     stage2Url: 'https://youtu.be/dQw4w9WgXcQ?si=Ba_6rd1HG80EjtXY'
   };
 
@@ -690,10 +753,13 @@
   function triggerStage1(){
     if(eggStage !== 0) return;
     eggStage = 1;
+    window.eggStage = 1;
     clickCount = 0;
-    avatarImg.src = window.eggConfig.avatar;
+    if(window.eggConfig.avatar) avatarImg.src = window.eggConfig.avatar;
     subText.textContent = EGG_SUB;
-    try{ eggAudio.currentTime = 0; eggAudio.play(); }catch(err){}
+    if(window.eggConfig.sound){
+      try{ eggAudio.currentTime = 0; eggAudio.play(); }catch(err){}
+    }
   }
   function triggerStage2(){
     if(eggStage !== 1) return;
@@ -701,10 +767,11 @@
   }
   function resetEgg(){
     eggStage = 0;
+    window.eggStage = 0;
     clickCount = 0;
     clearTimeout(pressTimer);
     if(typeof window.restoreCurrentAvatar === 'function') window.restoreCurrentAvatar();
-    subText.textContent = ORIGINAL_SUB;
+    subText.textContent = window.currentSubtitle || '';
   }
   function currentPressDuration(){
     return eggStage === 0 ? 11451 : 11000;
@@ -742,28 +809,58 @@
   avatarWrap.addEventListener('click', handleClick);
 
   // ---------- About 頁：四方塊互動 ----------
-  const BIO_HTML = `<div class="modal-title">自介</div><div class="bio">
-文字置入測試
-我是自介。</div>`;
+  window.currentBio = window.currentBio || '';
+  function buildBioHtml(){
+    const bio = window.currentBio && window.currentBio.trim()
+      ? escapeHtmlLocal(window.currentBio)
+      : '尚未填寫自介內容。';
+    return `<div class="modal-title">自介</div><div class="bio">${bio}</div>`;
+  }
+  function escapeHtmlLocal(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
 
-  const MUSIC_HTML = `
-    <div class="modal-title">最愛歌單</div>
-    <div style="font-size:12.5px; color:var(--muted); font-weight:500; line-height:1.6; margin-bottom:14px;">這是文字</div>
-    <div style="border-radius:16px; overflow:hidden; border:1px solid var(--line);">
-      <iframe src="https://open.spotify.com/embed/playlist/2gATEirHEhc8MiQpE2MBGS?utm_source=generator&theme=0"
-        width="100%" height="352" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
-    </div>
-  `;
+  window.aboutModals = window.aboutModals || {};
 
-  const FLICKR_URL = 'https://www.flickr.com/gp/204066960@N03/7K8j6DK20v';
-  const FLICKR_CONFIRM_HTML = `
-    <div class="modal-title">要前往 Flickr 嗎？</div>
-    <div style="font-size:13px; color:var(--ink); line-height:1.7; margin-bottom:20px;">即將離開這個網站，跳轉到 Flickr 查看完整攝影作品相簿。</div>
-    <div style="display:flex; gap:10px;">
-      <button id="flickrStayBtn" style="flex:1; padding:12px; border-radius:14px; border:1px solid var(--line); background:transparent; color:var(--ink); font-weight:700; font-size:13.5px; cursor:pointer;">留下</button>
-      <button id="flickrGoBtn" style="flex:1; padding:12px; border-radius:14px; border:none; background:var(--ink); color:#F6EEDF; font-weight:700; font-size:13.5px; cursor:pointer;">確認前往</button>
-    </div>
-  `;
+  function extractSpotifyPlaylistId(url){
+    if(!url) return '';
+    const m = url.match(/playlist[/:]([a-zA-Z0-9]+)/);
+    return m ? m[1] : '';
+  }
+
+  function buildMusicHtml(){
+    const m = window.aboutModals || {};
+    const title = m.musicTitle || '私心歌單';
+    const desc = m.musicDesc || '';
+    const playlistId = extractSpotifyPlaylistId(m.musicUrl);
+    const embed = playlistId
+      ? `<div style="border-radius:16px; overflow:hidden; border:1px solid var(--line);">
+           <iframe src="https://open.spotify.com/embed/playlist/${playlistId}?utm_source=generator&theme=0"
+             width="100%" height="352" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+         </div>`
+      : `<div class="bio">尚未設定歌單網址。</div>`;
+    return `
+      <div class="modal-title">${escapeHtmlLocal(title)}</div>
+      ${desc ? `<div style="font-size:12.5px; color:var(--muted); font-weight:500; line-height:1.6; margin-bottom:14px;">${escapeHtmlLocal(desc)}</div>` : ''}
+      ${embed}
+    `;
+  }
+
+  function buildPhotoConfirmHtml(){
+    const m = window.aboutModals || {};
+    const title = m.photoTitle || '要前往 Flickr 嗎？';
+    const desc = m.photoDesc || '即將離開這個網站，跳轉到相簿。';
+    return `
+      <div class="modal-title">${escapeHtmlLocal(title)}</div>
+      <div style="font-size:13px; color:var(--ink); line-height:1.7; margin-bottom:20px;">${escapeHtmlLocal(desc)}</div>
+      <div style="display:flex; gap:10px;">
+        <button id="flickrStayBtn" style="flex:1; padding:12px; border-radius:14px; border:1px solid var(--line); background:transparent; color:var(--ink); font-weight:700; font-size:13.5px; cursor:pointer;">留下</button>
+        <button id="flickrGoBtn" style="flex:1; padding:12px; border-radius:14px; border:none; background:var(--ink); color:#F6EEDF; font-weight:700; font-size:13.5px; cursor:pointer;">確認前往</button>
+      </div>
+    `;
+  }
 
   function buildFursonaHtml(){
     const list = (window.fursonaList && window.fursonaList.length) ? window.fursonaList : null;
@@ -774,7 +871,7 @@
         <div style="font-size:12px; color:var(--muted); font-weight:600; margin:6px 0 16px;">${f.label ? f.label.replace(/</g,'&lt;') : ''}</div>
       `).join('');
     } else {
-      html += `<img class="modal-img" src="images/reference-sheet.webp" alt="Julian 角色設定圖">`;
+      html += `<div class="bio">尚未上傳設定圖。</div>`;
     }
     return html;
   }
@@ -793,14 +890,15 @@
   modalClose.addEventListener('click', closeModal);
   modalOverlay.addEventListener('click', e=>{ if(e.target === modalOverlay) closeModal(); });
 
-  document.getElementById('tileBio').addEventListener('click', ()=> openModal(BIO_HTML));
+  document.getElementById('tileBio').addEventListener('click', ()=> openModal(buildBioHtml()));
   document.getElementById('tileRef').addEventListener('click', ()=> openModal(buildFursonaHtml()));
-  document.getElementById('tileMusic').addEventListener('click', ()=> openModal(MUSIC_HTML));
+  document.getElementById('tileMusic').addEventListener('click', ()=> openModal(buildMusicHtml()));
   document.getElementById('tilePhoto').addEventListener('click', ()=>{
-    openModal(FLICKR_CONFIRM_HTML);
+    openModal(buildPhotoConfirmHtml());
     document.getElementById('flickrStayBtn').addEventListener('click', closeModal);
     document.getElementById('flickrGoBtn').addEventListener('click', ()=>{
-      window.open(FLICKR_URL, '_blank', 'noopener');
+      const url = (window.aboutModals && window.aboutModals.photoUrl) || '#';
+      window.open(url, '_blank', 'noopener');
       closeModal();
     });
   });
@@ -1001,13 +1099,13 @@
     }
     const html = photos.map(p => `
       <div class="pin" data-url="${p.imageUrl}" data-cap="${(p.caption||'').replace(/"/g,'&quot;')}">
-        <img src="${p.imageUrl}" alt="${escapeHtml(p.caption||'')}" loading="lazy">
+        <img src="${p.imageUrl}" alt="${escapeHtml(p.caption||'')}" decoding="async">
         ${p.caption ? `<div class="cap">${escapeHtml(p.caption)}</div>` : ''}
       </div>
     `).join('');
     masonryMain.innerHTML = html;
     masonryClone.innerHTML = photos.slice(0,4).map(p => `
-      <div class="pin"><img src="${p.imageUrl}" alt="" loading="lazy"></div>
+      <div class="pin"><img src="${p.imageUrl}" alt="" decoding="async"></div>
     `).join('');
 
     masonryMain.querySelectorAll('.pin').forEach(el=>{
@@ -1043,7 +1141,7 @@
 
   function applyAvatar(){
     if(!window.avatarLib.length){
-      avatarImgEl.src = 'images/avatar.png';
+      avatarImgEl.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23E8DCC8'/%3E%3C/svg%3E";
       pfpCreditEl.textContent = '';
       return;
     }
@@ -1078,10 +1176,34 @@
     applyAvatar();
   }
 
+  /* ============ 關於我彈出視窗文字（即時） ============ */
+  window.aboutModals = window.aboutModals || {};
+  try{
+    onSnapshot(doc(db, 'settings', 'aboutModals'), (snap)=>{
+      window.aboutModals = snap.exists() ? snap.data() : {};
+    });
+  }catch(err){}
+
+  /* ============ 首頁小描述 + 自介（即時） ============ */
+  try{
+    onSnapshot(doc(db, 'profile', 'main'), (snap)=>{
+      const data = snap.exists() ? snap.data() : {};
+      window.currentSubtitle = data.subtitle || '';
+      window.currentBio = data.bio || '';
+      // 彩蛋顯示中的話先不要蓋掉彩蛋文字，等離開後 resetEgg() 會自動套用最新小描述
+      if(!window.eggStage || window.eggStage === 0){
+        const subEl = document.getElementById('subText');
+        const subCloneEl = document.getElementById('subTextClone');
+        if(subEl) subEl.textContent = window.currentSubtitle;
+        if(subCloneEl) subCloneEl.textContent = window.currentSubtitle;
+      }
+    });
+  }catch(err){}
+
   /* ============ 彩蛋設定（即時） ============ */
   window.eggConfig = window.eggConfig || {
-    avatar: 'images/avatar-easter-egg.png',
-    sound: 'audio/easter-egg.mp3',
+    avatar: '',
+    sound: '',
     stage2Url: 'https://youtu.be/dQw4w9WgXcQ?si=Ba_6rd1HG80EjtXY'
   };
   try{
@@ -1110,6 +1232,7 @@
         const tileRef = document.getElementById('tileRef');
         if(tileRef){
           tileRef.style.backgroundImage = `linear-gradient(180deg, rgba(58,46,34,0) 40%, rgba(58,46,34,.55) 100%), url('${list[0].imageUrl}')`;
+          tileRef.classList.add('has-img');
         }
       }
     });
@@ -1120,6 +1243,79 @@
     d.textContent = str;
     return d.innerHTML;
   }
+
+  /* ============ Spotify Now Playing（即時進度條） ============ */
+  const NOWPLAYING_API = 'https://novatorem-39a6-nine.vercel.app/api/nowplaying';
+  let npData = null;
+  let npFetchTime = 0;
+
+  function formatMs(ms){
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${String(s).padStart(2,'0')}`;
+  }
+
+  function renderNowPlaying(){
+    const skeleton = document.getElementById('npSkeleton');
+    const card = document.getElementById('npCard2');
+    const fallback = document.getElementById('npFallback');
+    const listenBtn = document.getElementById('npListenBtn');
+    const label = document.getElementById('npLabel');
+
+    skeleton.style.display = 'none';
+
+    if(!npData || !npData.has_track){
+      card.style.display = 'none';
+      listenBtn.style.display = 'none';
+      fallback.style.display = 'flex';
+      label.textContent = '🎧 Spotify';
+      return;
+    }
+
+    fallback.style.display = 'none';
+    card.style.display = 'flex';
+    listenBtn.style.display = 'flex';
+    label.textContent = npData.is_playing ? '🎧 目前在聽' : '🎧 已暫停';
+
+    document.getElementById('npArt').src = npData.album_art || '';
+    document.getElementById('npTitle2').textContent = npData.title || '';
+    document.getElementById('npArtist2').textContent = npData.artist || '';
+    document.getElementById('npDuration').textContent = formatMs(npData.duration_ms);
+    document.getElementById('npPauseBadge').style.display = npData.is_playing ? 'none' : 'flex';
+    listenBtn.href = npData.song_url || '#';
+
+    tickProgress();
+  }
+
+  function tickProgress(){
+    if(!npData || !npData.has_track) return;
+    let elapsed = npData.progress_ms || 0;
+    if(npData.is_playing){
+      elapsed += (Date.now() - npFetchTime);
+    }
+    elapsed = Math.min(elapsed, npData.duration_ms || 0);
+    const pct = npData.duration_ms ? (elapsed / npData.duration_ms * 100) : 0;
+    const fill = document.getElementById('npFill');
+    const elapsedEl = document.getElementById('npElapsed');
+    if(fill) fill.style.width = pct + '%';
+    if(elapsedEl) elapsedEl.textContent = formatMs(elapsed);
+  }
+
+  async function fetchNowPlaying(){
+    try{
+      const res = await fetch(NOWPLAYING_API, { cache: 'no-store' });
+      npData = await res.json();
+      npFetchTime = Date.now();
+    }catch(err){
+      npData = null;
+    }
+    renderNowPlaying();
+  }
+
+  fetchNowPlaying();
+  setInterval(fetchNowPlaying, 15000); // 每 15 秒重新對時一次，避免誤差累積
+  setInterval(tickProgress, 1000);     // 每秒在本地跳動進度條，不用一直打 API
 </script>
 </body>
 </html>
