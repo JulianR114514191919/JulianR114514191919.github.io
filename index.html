@@ -756,6 +756,8 @@
     window.eggStage = 1;
     clickCount = 0;
     if(window.eggConfig.avatar) avatarImg.src = window.eggConfig.avatar;
+    const pfpEl = document.getElementById('pfpCredit');
+    if(pfpEl) pfpEl.textContent = '';
     subText.textContent = EGG_SUB;
     if(window.eggConfig.sound){
       try{ eggAudio.currentTime = 0; eggAudio.play(); }catch(err){}
@@ -1138,8 +1140,14 @@
   const pfpCreditEl = document.getElementById('pfpCredit');
   window.avatarLib = [];
   window.avatarIndex = 0;
+  let avatarSwapToken = 0;
 
   function applyAvatar(){
+    // 彩蛋顯示中，絕對不能被頭貼庫的資料更新覆蓋掉
+    if(window.eggStage && window.eggStage !== 0) return;
+
+    const myToken = ++avatarSwapToken;
+
     if(!window.avatarLib.length){
       avatarImgEl.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23E8DCC8'/%3E%3C/svg%3E";
       pfpCreditEl.textContent = '';
@@ -1148,6 +1156,9 @@
     const a = window.avatarLib[window.avatarIndex % window.avatarLib.length];
     avatarImgEl.style.opacity = '0';
     setTimeout(()=>{
+      // 如果這段等待期間又觸發了更新的請求（連點太快）或彩蛋已經啟動，這次的結果就作廢
+      if(myToken !== avatarSwapToken) return;
+      if(window.eggStage && window.eggStage !== 0) return;
       avatarImgEl.src = a.imageUrl;
       pfpCreditEl.textContent = a.artist ? `PFP by ${a.artist}` : '';
       avatarImgEl.style.opacity = '1';
@@ -1156,6 +1167,7 @@
 
   window.cycleAvatar = function(){
     if(!window.avatarLib.length) return;
+    if(window.eggStage && window.eggStage !== 0) return;
     window.avatarIndex = (window.avatarIndex + 1) % window.avatarLib.length;
     applyAvatar();
   };
@@ -1276,20 +1288,30 @@
     fallback.style.display = 'none';
     card.style.display = 'flex';
     listenBtn.style.display = 'flex';
-    label.textContent = npData.is_playing ? '🎧 目前在聽' : '🎧 已暫停';
+
+    const progressRow = document.querySelector('.np-progress-row');
+
+    if(npData.is_last_played){
+      label.textContent = '🎧 最後播放：';
+      document.getElementById('npPauseBadge').style.display = 'none';
+      if(progressRow) progressRow.style.display = 'none';
+    } else {
+      label.textContent = npData.is_playing ? '🎧 目前在聽' : '🎧 已暫停';
+      document.getElementById('npPauseBadge').style.display = npData.is_playing ? 'none' : 'flex';
+      if(progressRow) progressRow.style.display = 'flex';
+    }
 
     document.getElementById('npArt').src = npData.album_art || '';
     document.getElementById('npTitle2').textContent = npData.title || '';
     document.getElementById('npArtist2').textContent = npData.artist || '';
     document.getElementById('npDuration').textContent = formatMs(npData.duration_ms);
-    document.getElementById('npPauseBadge').style.display = npData.is_playing ? 'none' : 'flex';
     listenBtn.href = npData.song_url || '#';
 
     tickProgress();
   }
 
   function tickProgress(){
-    if(!npData || !npData.has_track) return;
+    if(!npData || !npData.has_track || npData.is_last_played) return;
     let elapsed = npData.progress_ms || 0;
     if(npData.is_playing){
       elapsed += (Date.now() - npFetchTime);
