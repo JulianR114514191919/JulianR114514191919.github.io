@@ -422,6 +422,7 @@
         <div class="glass top">
           <div class="h2">照片牆</div>
           <div class="masonry" id="masonryClone"></div>
+          <a class="albumbtn" href="https://www.flickr.com/gp/204066960@N03/7K8j6DK20v" target="_blank" rel="noopener">在 Flickr 查看完整相簿 →</a>
         </div>
       </div>
 
@@ -457,7 +458,7 @@
               </div>
             </div>
             <a class="np-listen-btn" id="npListenBtn" href="#" target="_blank" rel="noopener" style="display:none;">
-              <span class="dot"></span> 在 Spotify 聽
+              <span class="dot"></span> 在 Spotify 上聆聽
             </a>
             <div class="nowplaying" id="npFallback" style="display:none;">
               <div class="cover">🎵</div>
@@ -527,7 +528,8 @@
       <!-- 複製的 P1，放最後面用於正向無縫循環 -->
       <div class="page" id="p1clone">
         <div class="glass">
-          <div class="avatar"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23E8DCC8'/%3E%3C/svg%3E" alt="Julian"></div>
+          <div class="avatar"><img id="avatarImgClone" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23E8DCC8'/%3E%3C/svg%3E" alt="Julian"></div>
+          <div class="pfp-credit" id="pfpCreditClone"></div>
           <div class="hello">Hi, my name is</div>
           <div class="name" style="animation:none; opacity:1; transform:none; filter:none;">Julian</div>
           <div class="sub" id="subTextClone"></div>
@@ -553,6 +555,9 @@
                 </div>
               </div>
             </div>
+            <a class="np-listen-btn" id="npListenBtnClone" href="#" target="_blank" rel="noopener" style="display:none;">
+              <span class="dot"></span> 在 Spotify 上聆聽
+            </a>
             <div class="nowplaying" id="npFallbackClone" style="display:flex;">
               <div class="cover">🎵</div>
               <div class="meta">
@@ -562,6 +567,7 @@
               </div>
             </div>
           </div>
+          <div class="hint">(聽說長按頭貼11451.4毫秒會有好康的)</div>
         </div>
       </div>
 
@@ -944,7 +950,7 @@
   }
   function triggerStage2(){
     if(eggStage !== 1) return;
-    window.location.href = window.eggConfig.stage2Url;
+    window.open(window.eggConfig.stage2Url, '_blank', 'noopener');
   }
   function resetEgg(){
     eggStage = 0;
@@ -1285,9 +1291,7 @@
       </div>
     `).join('');
     masonryMain.innerHTML = html;
-    masonryClone.innerHTML = photos.slice(0,4).map(p => `
-      <div class="pin"><img src="${p.imageUrl}" alt="" decoding="async"></div>
-    `).join('');
+    masonryClone.innerHTML = html;
 
     masonryMain.querySelectorAll('.pin').forEach((el, idx)=>{
       el.addEventListener('click', ()=>{
@@ -1403,6 +1407,10 @@
       avatarImgEl.src = a.imageUrl;
       pfpCreditEl.textContent = a.artist ? `PFP by ${a.artist}` : '';
       avatarImgEl.style.opacity = '1';
+      const cloneImg = document.getElementById('avatarImgClone');
+      const clonePfp = document.getElementById('pfpCreditClone');
+      if(cloneImg) cloneImg.src = a.imageUrl;
+      if(clonePfp) clonePfp.textContent = a.artist ? `PFP by ${a.artist}` : '';
       if(typeof window.setFavicon === 'function') window.setFavicon(a.imageUrl);
     }, 150);
   }
@@ -1530,7 +1538,7 @@
       const card = document.getElementById('npCard2' + suf);
       const fallback = document.getElementById('npFallback' + suf);
       const label = document.getElementById('npLabel' + suf);
-      const listenBtn = suf === '' ? document.getElementById('npListenBtn') : null;
+      const listenBtn = document.getElementById('npListenBtn' + suf);
 
       if(!npData || !npData.has_track){
         card.style.display = 'none';
