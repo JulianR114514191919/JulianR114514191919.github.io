@@ -176,7 +176,7 @@
     background: var(--chip-bg); color:var(--chip-text); font-weight:700; font-size:12.5px;
     text-decoration:none;
   }
-  .np-listen-btn .dot{ width:7px; height:7px; border-radius:50%; background:#1DB954; flex-shrink:0; }
+  .np-listen-btn .np-dot{ width:7px; height:7px; border-radius:50%; background:#1DB954; flex-shrink:0; }
 
   .np-skeleton{
     width:100%; height:64px; border-radius:18px;
@@ -407,6 +407,56 @@
   .cal-item .ci-desc{ font-size:11.5px; color:var(--muted); margin-top:2px; }
   .cal-empty{ font-size:12px; color:var(--muted); text-align:center; padding:10px 0; }
 </style>
+<script>
+  // 搶在畫面畫出來之前，先套用上次記住的自訂配色，避免「先閃預設色、才變成設定色」
+  (function(){
+    try{
+      const cached = localStorage.getItem('julian_theme_colors');
+      if(!cached) return;
+      const t = JSON.parse(cached);
+      if(!t.color1 || !t.color2 || !t.color3) return;
+
+      function hexToRgb(hex){
+        hex = (hex||'').replace('#','').trim();
+        if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+        const num = parseInt(hex,16);
+        if(isNaN(num)) return {r:0,g:0,b:0};
+        return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+      }
+      function mix(c1,c2,t){ return { r:c1.r+(c2.r-c1.r)*t, g:c1.g+(c2.g-c1.g)*t, b:c1.b+(c2.b-c1.b)*t }; }
+      function luminance(c){
+        const a=[c.r,c.g,c.b].map(v=>{ v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); });
+        return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2];
+      }
+      function rgba(c,a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
+      function toHex(r,g,b){ return '#'+[r,g,b].map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join(''); }
+
+      const c1 = hexToRgb(t.color1), c2 = hexToRgb(t.color2), c3 = hexToRgb(t.color3);
+      const isLight = luminance(c3) > 0.5;
+      const black = {r:0,g:0,b:0}, white = {r:255,g:255,b:255};
+      const ink = isLight ? mix(c3, black, 0.82) : mix(c3, white, 0.9);
+      const muted = isLight ? mix(c3, black, 0.5) : mix(c3, white, 0.55);
+      const glassBase = isLight ? white : mix(c3, black, 0.4);
+
+      const root = document.documentElement.style;
+      root.setProperty('--rust', t.color1);
+      root.setProperty('--moss', t.color2);
+      root.setProperty('--bg-base', t.color3);
+      root.setProperty('--ink', toHex(ink.r, ink.g, ink.b));
+      root.setProperty('--muted', toHex(muted.r, muted.g, muted.b));
+      root.setProperty('--line', isLight ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.10)');
+      root.setProperty('--glass', rgba(glassBase, isLight?0.38:0.55));
+      root.setProperty('--glass-strong', rgba(glassBase, isLight?0.58:0.72));
+      root.setProperty('--chip-bg', toHex(ink.r, ink.g, ink.b));
+      root.setProperty('--chip-text', isLight ? '#F6EEDF' : '#16120E');
+      root.setProperty('--scrim', isLight ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.5)');
+      root.setProperty('--bg-radial-1', rgba(c1, 0.55));
+      root.setProperty('--bg-radial-2', rgba(mix(c1,c2,0.5), 0.5));
+      root.setProperty('--bg-radial-3', rgba(c2, 0.55));
+      root.setProperty('--bg-radial-4', rgba(mix(c3,c1,0.3), 0.4));
+    }catch(err){}
+  })();
+</script>
 </head>
 <body>
   <div class="blob blob1"></div>
@@ -458,7 +508,7 @@
               </div>
             </div>
             <a class="np-listen-btn" id="npListenBtn" href="#" target="_blank" rel="noopener" style="display:none;">
-              <span class="dot"></span> 在 Spotify 上聆聽
+              <span class="np-dot"></span> 在 Spotify 上聆聽
             </a>
             <div class="nowplaying" id="npFallback" style="display:none;">
               <div class="cover">🎵</div>
@@ -556,7 +606,7 @@
               </div>
             </div>
             <a class="np-listen-btn" id="npListenBtnClone" href="#" target="_blank" rel="noopener" style="display:none;">
-              <span class="dot"></span> 在 Spotify 上聆聽
+              <span class="np-dot"></span> 在 Spotify 上聆聽
             </a>
             <div class="nowplaying" id="npFallbackClone" style="display:flex;">
               <div class="cover">🎵</div>
@@ -624,7 +674,7 @@
 
 <script>
   const track = document.getElementById('track');
-  const dots = document.querySelectorAll('.dot');
+  const dots = document.querySelectorAll('.dots .dot');
   const allGlass = document.querySelectorAll('.glass');
   const realPages = document.querySelectorAll('#p1 .glass, #p2 .glass, #p3 .glass, #p4 .glass');
 
@@ -953,12 +1003,17 @@
     window.open(window.eggConfig.stage2Url, '_blank', 'noopener');
   }
   function resetEgg(){
+    const wasActive = eggStage !== 0;
     eggStage = 0;
     window.eggStage = 0;
     clickCount = 0;
     clearTimeout(pressTimer);
-    if(typeof window.restoreCurrentAvatar === 'function') window.restoreCurrentAvatar();
-    subText.textContent = window.currentSubtitle || '';
+    // 只有彩蛋真的有在顯示中才需要重置頭貼／小描述，
+    // 不然每次單純回到第一頁都會白白讓頭貼閃一下淡出淡入
+    if(wasActive){
+      if(typeof window.restoreCurrentAvatar === 'function') window.restoreCurrentAvatar();
+      subText.textContent = window.currentSubtitle || '';
+    }
   }
   function currentPressDuration(){
     return eggStage === 0 ? 11451 : 11000;
@@ -1493,6 +1548,7 @@
 
   function applyCustomTheme(hex1, hex2, hex3){
     if(!hex1 || !hex2 || !hex3) return; // 空值代表使用預設配色（含自動深色模式），不覆寫
+    try{ localStorage.setItem('julian_theme_colors', JSON.stringify({color1:hex1, color2:hex2, color3:hex3})); }catch(err){}
     const c1 = hexToRgbLocal(hex1), c2 = hexToRgbLocal(hex2), c3 = hexToRgbLocal(hex3);
     const isLight = luminanceLocal(c3) > 0.5;
     const black = {r:0,g:0,b:0}, white = {r:255,g:255,b:255};
@@ -1522,6 +1578,10 @@
     onSnapshot(doc(db, 'settings', 'theme'), (snap)=>{
       if(!snap.exists()) return;
       const d = snap.data();
+      if(!d.color1 || !d.color2 || !d.color3){
+        try{ localStorage.removeItem('julian_theme_colors'); }catch(err){}
+        return;
+      }
       applyCustomTheme(d.color1, d.color2, d.color3);
     });
   }catch(err){}
