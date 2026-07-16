@@ -15,6 +15,8 @@
     --glass-strong: rgba(255,251,242,0.75);
     --ease: cubic-bezier(0.32, 0.72, 0, 1);
     --danger:#B8453D;
+    --bg-radial-1: #E8B98A; --bg-radial-2: #C97A55; --bg-radial-3: #8A9668; --bg-radial-4: #D9A05B;
+    --bg-base: #EFE4D2;
   }
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ min-height:100%; }
@@ -24,11 +26,11 @@
     -webkit-font-smoothing:antialiased;
     min-height:100dvh;
     background:
-      radial-gradient(circle at 20% 20%, #E8B98A 0%, transparent 45%),
-      radial-gradient(circle at 85% 15%, #C97A55 0%, transparent 40%),
-      radial-gradient(circle at 75% 85%, #8A9668 0%, transparent 45%),
-      radial-gradient(circle at 10% 90%, #D9A05B 0%, transparent 40%),
-      #EFE4D2;
+      radial-gradient(circle at 20% 20%, var(--bg-radial-1) 0%, transparent 45%),
+      radial-gradient(circle at 85% 15%, var(--bg-radial-2) 0%, transparent 40%),
+      radial-gradient(circle at 75% 85%, var(--bg-radial-3) 0%, transparent 45%),
+      radial-gradient(circle at 10% 90%, var(--bg-radial-4) 0%, transparent 40%),
+      var(--bg-base);
     background-attachment: fixed;
     padding: 28px 16px 60px;
   }
@@ -169,6 +171,53 @@
   .theme-preview .tp-tag{ display:inline-block; padding:6px 12px; border-radius:999px; font-size:11px; font-weight:700; margin-right:6px; }
   .theme-preview .tp-btn{ display:inline-block; margin-top:10px; padding:8px 16px; border-radius:12px; font-size:12px; font-weight:700; }
 </style>
+<script>
+  // 搶在畫面畫出來之前，先套用上次記住的自訂配色（跟公開網站共用同一個快取，同網域下互通）
+  (function(){
+    try{
+      const cached = localStorage.getItem('julian_theme_colors');
+      if(!cached) return;
+      const t = JSON.parse(cached);
+      if(!t.color1 || !t.color2 || !t.color3) return;
+
+      function hexToRgb(hex){
+        hex = (hex||'').replace('#','').trim();
+        if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+        const num = parseInt(hex,16);
+        if(isNaN(num)) return {r:0,g:0,b:0};
+        return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+      }
+      function mix(c1,c2,t){ return { r:c1.r+(c2.r-c1.r)*t, g:c1.g+(c2.g-c1.g)*t, b:c1.b+(c2.b-c1.b)*t }; }
+      function luminance(c){
+        const a=[c.r,c.g,c.b].map(v=>{ v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); });
+        return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2];
+      }
+      function rgba(c,a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
+      function toHex(r,g,b){ return '#'+[r,g,b].map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join(''); }
+
+      const c1 = hexToRgb(t.color1), c2 = hexToRgb(t.color2), c3 = hexToRgb(t.color3);
+      const isLight = luminance(c3) > 0.5;
+      const black = {r:0,g:0,b:0}, white = {r:255,g:255,b:255};
+      const ink = isLight ? mix(c3, black, 0.82) : mix(c3, white, 0.9);
+      const muted = isLight ? mix(c3, black, 0.5) : mix(c3, white, 0.55);
+      const glassBase = isLight ? white : mix(c3, black, 0.4);
+
+      const root = document.documentElement.style;
+      root.setProperty('--rust', t.color1);
+      root.setProperty('--moss', t.color2);
+      root.setProperty('--bg-base', t.color3);
+      root.setProperty('--ink', toHex(ink.r, ink.g, ink.b));
+      root.setProperty('--muted', toHex(muted.r, muted.g, muted.b));
+      root.setProperty('--line', isLight ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.10)');
+      root.setProperty('--glass', rgba(glassBase, isLight?0.38:0.55));
+      root.setProperty('--glass-strong', rgba(glassBase, isLight?0.58:0.72));
+      root.setProperty('--bg-radial-1', rgba(c1, 0.55));
+      root.setProperty('--bg-radial-2', rgba(mix(c1,c2,0.5), 0.5));
+      root.setProperty('--bg-radial-3', rgba(c2, 0.55));
+      root.setProperty('--bg-radial-4', rgba(mix(c3,c1,0.3), 0.4));
+    }catch(err){}
+  })();
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -933,6 +982,31 @@
     `;
   }
 
+  function applyThemeToAdmin(hex1, hex2, hex3){
+    const root = document.documentElement.style;
+    if(!hex1 || !hex2 || !hex3){
+      // 空值：清掉手動覆寫，讓 :root 預設值生效
+      ['--rust','--moss','--bg-base','--ink','--muted','--line','--glass','--glass-strong',
+       '--bg-radial-1','--bg-radial-2','--bg-radial-3','--bg-radial-4'].forEach(p=> root.removeProperty(p));
+      try{ localStorage.removeItem('julian_theme_colors'); }catch(err){}
+      return;
+    }
+    const t = deriveTheme(hex1, hex2, hex3);
+    root.setProperty('--rust', t.rust);
+    root.setProperty('--moss', t.moss);
+    root.setProperty('--bg-base', t.bgBase);
+    root.setProperty('--ink', t.ink);
+    root.setProperty('--muted', t.muted);
+    root.setProperty('--line', t.line);
+    root.setProperty('--glass', t.glass);
+    root.setProperty('--glass-strong', t.glassStrong);
+    root.setProperty('--bg-radial-1', t.radial1);
+    root.setProperty('--bg-radial-2', t.radial2);
+    root.setProperty('--bg-radial-3', t.radial3);
+    root.setProperty('--bg-radial-4', t.radial4);
+    try{ localStorage.setItem('julian_theme_colors', JSON.stringify({color1:hex1, color2:hex2, color3:hex3})); }catch(err){}
+  }
+
   function initThemeColors(){
     const ref3 = doc(db, 'settings', 'theme');
     const p1 = document.getElementById('themeColor1Picker');
@@ -968,6 +1042,7 @@
         if(d.color1) p1.value = d.color1;
         if(d.color2) p2.value = d.color2;
         if(d.color3) p3.value = d.color3;
+        if(d.color1 && d.color2 && d.color3) applyThemeToAdmin(d.color1, d.color2, d.color3);
       }
       syncAndPreview();
     });
@@ -977,6 +1052,7 @@
         color1: p1.value, color2: p2.value, color3: p3.value,
         updatedAt: serverTimestamp()
       }, { merge:true });
+      applyThemeToAdmin(p1.value, p2.value, p3.value);
       const status = document.getElementById('themeStatus');
       status.classList.add('show');
       setTimeout(()=> status.classList.remove('show'), 2000);
@@ -986,6 +1062,7 @@
       await setDoc(ref3, { color1:'', color2:'', color3:'', updatedAt: serverTimestamp() }, { merge:true });
       p1.value = '#B85C34'; p2.value = '#6E7A52'; p3.value = '#EFE4D2';
       syncAndPreview();
+      applyThemeToAdmin('', '', '');
       const status = document.getElementById('themeStatus');
       status.textContent = '已恢復預設 ✓';
       status.classList.add('show');
