@@ -12,7 +12,7 @@
 <meta name="description" content="Julian · 紫毛狐狸．攝影師．快門自由">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Julian 🦊">
-<meta property="og:description" content="紫毛狐狸．攝影師．快門自由 — 自介、設定圖、私心歌單、照片牆都在這裡">
+<meta property="og:description" content="紫毛狐狸．攝影師．快門自由 — 自介、設定圖、最愛歌單、照片牆都在這裡">
 <meta property="og:url" content="https://julianr114514191919.github.io/">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Julian 🦊">
@@ -68,9 +68,36 @@
     background-attachment: fixed;
     transition: background-color .3s ease;
   }
-  .blob{ position:fixed; border-radius:50%; filter: blur(70px); opacity:.5; z-index:0; }
-  .blob1{ width:280px; height:280px; background:var(--bg-radial-2); top:-60px; left:-60px; }
-  .blob2{ width:240px; height:240px; background:var(--bg-radial-3); bottom:-40px; right:-40px; }
+  .blob{ position:fixed; border-radius:50%; filter: blur(70px); opacity:.5; z-index:0; will-change: transform; }
+  .blob1{ width:280px; height:280px; background:var(--bg-radial-2); top:-60px; left:-60px; animation: liquidFloat1 15s ease-in-out infinite alternate; }
+  .blob2{ width:240px; height:240px; background:var(--bg-radial-3); bottom:-40px; right:-40px; animation: liquidFloat2 18s ease-in-out infinite alternate; }
+  .blob3{ width:220px; height:220px; background:var(--bg-radial-1); top:38%; left:60%; animation: liquidFloat3 21s ease-in-out infinite alternate; opacity:.35; }
+
+  /* 岩漿燈風格：緩慢上浮、變形、下沉，多個轉折點讓運動更有機、不是單調的來回 */
+  @keyframes liquidFloat1{
+    0%{ transform: translate(0, 0) scale(1); }
+    28%{ transform: translate(45px, -30px) scale(1.15); }
+    55%{ transform: translate(70px, 55px) scale(0.85); }
+    78%{ transform: translate(15px, 100px) scale(1.2); }
+    100%{ transform: translate(-20px, 40px) scale(0.95); }
+  }
+  @keyframes liquidFloat2{
+    0%{ transform: translate(0, 0) scale(1); }
+    30%{ transform: translate(-55px, -40px) scale(1.2); }
+    58%{ transform: translate(-30px, -85px) scale(0.8); }
+    82%{ transform: translate(-90px, -20px) scale(1.1); }
+    100%{ transform: translate(-40px, 30px) scale(0.9); }
+  }
+  @keyframes liquidFloat3{
+    0%{ transform: translate(0, 0) scale(1); }
+    25%{ transform: translate(-40px, 60px) scale(0.9); }
+    52%{ transform: translate(-80px, 10px) scale(1.25); }
+    76%{ transform: translate(-30px, -55px) scale(0.85); }
+    100%{ transform: translate(35px, -20px) scale(1.1); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .blob{ animation: none !important; }
+  }
 
   .app{ position:relative; height:100dvh; width:100%; overflow:hidden; z-index:1; }
 
@@ -208,9 +235,19 @@
   .about-tile .dd{ font-size:10px; color:var(--muted); font-weight:600; margin-top:2px; }
   .about-tile.ref{
     background-color: var(--glass-strong);
-    background-size: cover; background-position: center 20%;
   }
-  .about-tile.ref.has-img{ background-image: linear-gradient(180deg, rgba(58,46,34,0) 40%, rgba(58,46,34,.55) 100%); }
+  .about-tile-img{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 20%;
+    z-index:0; opacity:0; transition: opacity .3s ease; transform: translateZ(0);
+  }
+  .about-tile-img.loaded{ opacity:1; }
+  .about-tile.ref .ic, .about-tile.ref .tt, .about-tile.ref .dd{ position:relative; z-index:2; }
+  .about-tile-overlay{
+    position:absolute; inset:0; z-index:1;
+    background: linear-gradient(180deg, rgba(58,46,34,0) 40%, rgba(58,46,34,.55) 100%);
+    opacity:0; transition: opacity .3s ease;
+  }
+  .about-tile.ref.has-img .about-tile-overlay{ opacity:1; }
   .about-tile.ref.has-img .tt, .about-tile.ref.has-img .dd{ color:#F6EEDF; }
 
   .bio{ font-size:13.6px; line-height:1.9; color:var(--ink); text-align:left; white-space:pre-line; font-weight:450; }
@@ -431,9 +468,12 @@
       function rgba(c,a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
       function toHex(r,g,b){ return '#'+[r,g,b].map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join(''); }
 
-      const c1 = hexToRgb(t.color1), c2 = hexToRgb(t.color2), c3 = hexToRgb(t.color3);
-      const isLight = luminance(c3) > 0.5;
+      const c1 = hexToRgb(t.color1), c2 = hexToRgb(t.color2);
+      const c3Picked = hexToRgb(t.color3);
       const black = {r:0,g:0,b:0}, white = {r:255,g:255,b:255};
+      const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const c3 = systemDark ? mix(c3Picked, black, 0.82) : c3Picked;
+      const isLight = !systemDark;
       const ink = isLight ? mix(c3, black, 0.82) : mix(c3, white, 0.9);
       const muted = isLight ? mix(c3, black, 0.5) : mix(c3, white, 0.55);
       const glassBase = isLight ? white : mix(c3, black, 0.4);
@@ -441,7 +481,7 @@
       const root = document.documentElement.style;
       root.setProperty('--rust', t.color1);
       root.setProperty('--moss', t.color2);
-      root.setProperty('--bg-base', t.color3);
+      root.setProperty('--bg-base', toHex(c3.r, c3.g, c3.b));
       root.setProperty('--ink', toHex(ink.r, ink.g, ink.b));
       root.setProperty('--muted', toHex(muted.r, muted.g, muted.b));
       root.setProperty('--line', isLight ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.10)');
@@ -461,6 +501,7 @@
 <body>
   <div class="blob blob1"></div>
   <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
 
   <audio id="eggAudio" preload="auto"></audio>
 
@@ -534,14 +575,16 @@
               <div class="dd">點開看完整介紹</div>
             </div>
             <div class="about-tile ref" id="tileRef">
+              <img class="about-tile-img" id="tileRefImg" alt="" decoding="async">
+              <div class="about-tile-overlay"></div>
               <div class="ic">🎨</div>
               <div class="tt">設定圖</div>
               <div class="dd">Julian 的角色設定</div>
             </div>
             <div class="about-tile" id="tileMusic">
               <div class="ic">🎧</div>
-              <div class="tt">私心歌單</div>
-              <div class="dd">點擊聽聽看</div>
+              <div class="tt">最愛歌單</div>
+              <div class="dd">點擊查看</div>
             </div>
             <div class="about-tile" id="tilePhoto">
               <div class="ic">📷</div>
@@ -677,6 +720,7 @@
   const dots = document.querySelectorAll('.dots .dot');
   const allGlass = document.querySelectorAll('.glass');
   const realPages = document.querySelectorAll('#p1 .glass, #p2 .glass, #p3 .glass, #p4 .glass');
+
 
   // 進場動畫只播一次，播完就把 animation 釋放掉，
   // 這樣之後 CSS 動畫不會一直「霸佔」transform 屬性的優先權，按壓縮放效果才能正常生效
@@ -891,7 +935,8 @@
       const moved = Math.hypot(e.clientX - mouseDownX, e.clientY - mouseDownY);
       if(moved < DRAG_THRESHOLD) return;
       realDrag = true;
-      app.style.cursor = 'grabbing';
+      window._isDraggingCursor = true;
+      app.style.cursor = window._cursorGrabbing || 'grabbing';
     }
     dragMove(e.clientX, e.clientY);
   });
@@ -899,16 +944,24 @@
   window.addEventListener('mouseup', e=>{
     if(realDrag){
       dragEnd();
-      const blockClick = ev => { ev.stopPropagation(); ev.preventDefault(); window.removeEventListener('click', blockClick, true); };
+      // 只攔截「翻頁卡片區域內」的下一次點擊，避免拖曳放開的瞬間誤觸發翻頁；
+      // 行事曆面板在這個區域外，點擊關閉不會受影響
+      const blockClick = ev => {
+        if(app.contains(ev.target)){
+          ev.stopPropagation(); ev.preventDefault();
+        }
+        window.removeEventListener('click', blockClick, true);
+      };
       window.addEventListener('click', blockClick, true);
     } else {
       isDragging = false;
       track.style.transition = '';
     }
-    app.style.cursor = 'grab';
+    window._isDraggingCursor = false;
+    app.style.cursor = window._cursorGrab || 'grab';
   });
 
-  app.style.cursor = 'grab';
+  app.style.cursor = window._cursorGrab || 'grab';
   track.style.transition = 'none';
   applyTransform();
   void track.offsetWidth;
@@ -966,6 +1019,38 @@
     if(link) link.href = url;
   };
 
+  // 自訂紫色游標（電腦版滑鼠專用，跟著網站主色一起變；形狀貼近瀏覽器預設箭頭）
+  window.setCursorColor = function(hex){
+    hex = hex || '#8B4FD9';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><polygon points="1,1 1,18 6,14 8.5,20.5 11.5,19.3 9,13 16,13" fill="${hex}" stroke="#242424" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+    const encoded = encodeURIComponent(svg);
+    const dataUri = `url('data:image/svg+xml,${encoded}') 1 1, auto`;
+    const grabUri = `url('data:image/svg+xml,${encoded}') 1 1, grab`;
+    const grabbingUri = `url('data:image/svg+xml,${encoded}') 1 1, grabbing`;
+    const pointerUri = `url('data:image/svg+xml,${encoded}') 1 1, pointer`;
+    document.body.style.cursor = dataUri;
+    window._cursorGrab = grabUri;
+    window._cursorGrabbing = grabbingUri;
+    const appEl = document.getElementById('app');
+    if(appEl) appEl.style.cursor = window._isDraggingCursor ? grabbingUri : grabUri;
+
+    // 所有原本會變成「手指」的可點擊元素，也統一換成同一個紫色游標
+    let styleTag = document.getElementById('cursorPointerStyle');
+    if(!styleTag){
+      styleTag = document.createElement('style');
+      styleTag.id = 'cursorPointerStyle';
+      document.head.appendChild(styleTag);
+    }
+    styleTag.textContent = `
+      a, button, .about-tile, .pin, .dot, .cal-cell, .cal-nav-btn,
+      .lightbox-nav, .lightbox-close, .modal-close, .cal-handle,
+      .albumbtn, .np-listen-btn, .tab, .avatar, .links a {
+        cursor: ${pointerUri} !important;
+      }
+    `;
+  };
+  window.setCursorColor(getComputedStyle(document.documentElement).getPropertyValue('--rust').trim());
+
   // 首頁小描述改由 Firebase 提供，這裡先放空字串，等後台資料載入後會自動填入
   window.currentSubtitle = window.currentSubtitle || '';
   window.eggStage = 0;
@@ -985,6 +1070,7 @@
     if(eggStage !== 0) return;
     eggStage = 1;
     window.eggStage = 1;
+    try{ if(navigator.vibrate) navigator.vibrate(40); }catch(err){}
     clickCount = 0;
     if(window.eggConfig.avatar){
       avatarImg.src = window.eggConfig.avatar;
@@ -1000,6 +1086,7 @@
   }
   function triggerStage2(){
     if(eggStage !== 1) return;
+    try{ if(navigator.vibrate) navigator.vibrate([30, 40, 30]); }catch(err){}
     window.open(window.eggConfig.stage2Url, '_blank', 'noopener');
   }
   function resetEgg(){
@@ -1074,7 +1161,7 @@
 
   function buildMusicHtml(){
     const m = window.aboutModals || {};
-    const title = m.musicTitle || '私心歌單';
+    const title = m.musicTitle || '最愛歌單';
     const desc = m.musicDesc || '';
     const playlistId = extractSpotifyPlaylistId(m.musicUrl);
     const embed = playlistId
@@ -1108,8 +1195,8 @@
     const list = (window.fursonaList && window.fursonaList.length) ? window.fursonaList : null;
     let html = `<div class="modal-title">設定圖</div>`;
     if(list){
-      html += list.map(f => `
-        <img class="modal-img" src="${f.imageUrl}" alt="">
+      html += list.map((f, idx) => `
+        <img class="modal-img" data-idx="${idx}" style="cursor:pointer;" src="${f.imageUrl}" alt="">
         <div style="font-size:12px; color:var(--muted); font-weight:600; margin:6px 0 16px;">${f.label ? f.label.replace(/</g,'&lt;') : ''}</div>
       `).join('');
     } else {
@@ -1133,7 +1220,15 @@
   modalOverlay.addEventListener('click', e=>{ if(e.target === modalOverlay) closeModal(); });
 
   document.getElementById('tileBio').addEventListener('click', ()=> openModal(buildBioHtml()));
-  document.getElementById('tileRef').addEventListener('click', ()=> openModal(buildFursonaHtml()));
+  document.getElementById('tileRef').addEventListener('click', ()=>{
+    openModal(buildFursonaHtml());
+    const list = (window.fursonaList || []).map(f => ({ imageUrl: f.imageUrl, caption: f.label || '' }));
+    document.querySelectorAll('#modalBody .modal-img[data-idx]').forEach(img=>{
+      img.addEventListener('click', ()=>{
+        if(typeof window.openLightbox === 'function') window.openLightbox(parseInt(img.dataset.idx, 10), list);
+      });
+    });
+  });
   document.getElementById('tileMusic').addEventListener('click', ()=> openModal(buildMusicHtml()));
   document.getElementById('tilePhoto').addEventListener('click', ()=>{
     openModal(buildPhotoConfirmHtml());
@@ -1355,7 +1450,7 @@
     });
   }
 
-  /* ============ 照片牆燈箱 ============ */
+  /* ============ 燈箱（照片牆 + 設定圖共用） ============ */
   (function(){
     const overlay = document.getElementById('lightboxOverlay');
     const stage = document.getElementById('lightboxStage');
@@ -1367,9 +1462,10 @@
     const nextBtn = document.getElementById('lightboxNext');
 
     let idx = 0;
+    let currentList = [];
 
     function render(){
-      const list = window.lightboxPhotos || [];
+      const list = currentList;
       if(!list.length) return;
       const p = list[idx];
       imgEl.style.opacity = '0';
@@ -1379,21 +1475,24 @@
         imgEl.style.opacity = '1';
       }, 120);
       capEl.textContent = p.caption || '';
-      counterEl.textContent = `${idx + 1} / ${list.length}`;
+      counterEl.textContent = list.length > 1 ? `${idx + 1} / ${list.length}` : '';
       prevBtn.disabled = idx === 0;
       nextBtn.disabled = idx === list.length - 1;
+      prevBtn.style.display = list.length > 1 ? 'flex' : 'none';
+      nextBtn.style.display = list.length > 1 ? 'flex' : 'none';
     }
 
-    window.openLightbox = function(i){
-      const list = window.lightboxPhotos || [];
-      if(!list.length) return;
-      idx = Math.max(0, Math.min(i, list.length - 1));
+    // list 參數可省略：省略時沿用照片牆清單（維持原本呼叫方式相容）
+    window.openLightbox = function(i, list){
+      currentList = list || window.lightboxPhotos || [];
+      if(!currentList.length) return;
+      idx = Math.max(0, Math.min(i, currentList.length - 1));
       render();
       overlay.classList.add('open');
     };
     function close(){ overlay.classList.remove('open'); }
     function goPrev(){ if(idx > 0){ idx--; render(); } }
-    function goNext(){ const list = window.lightboxPhotos || []; if(idx < list.length - 1){ idx++; render(); } }
+    function goNext(){ if(idx < currentList.length - 1){ idx++; render(); } }
 
     closeBtn.addEventListener('click', close);
     prevBtn.addEventListener('click', goPrev);
@@ -1407,14 +1506,53 @@
       if(e.key === 'ArrowRight') goNext();
     });
 
-    // 左右滑動切換照片
-    let sx = 0, sdx = 0, dragging = false;
-    stage.addEventListener('touchstart', e=>{ sx = e.touches[0].clientX; sdx = 0; dragging = true; }, {passive:true});
-    stage.addEventListener('touchmove', e=>{ if(dragging) sdx = e.touches[0].clientX - sx; }, {passive:true});
+    // 左右滑動切換照片；上下拖曳（仿 Apple 相簿）可以直接關閉
+    let sx = 0, sy = 0, sdx = 0, sdy = 0, dragging = false, axis = null;
+
+    stage.addEventListener('touchstart', e=>{
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      sdx = 0; sdy = 0; axis = null; dragging = true;
+      imgEl.style.transition = 'none';
+    }, {passive:true});
+
+    stage.addEventListener('touchmove', e=>{
+      if(!dragging) return;
+      const dx = e.touches[0].clientX - sx;
+      const dy = e.touches[0].clientY - sy;
+      if(axis === null){
+        axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      }
+      if(axis === 'x'){
+        sdx = dx;
+      } else {
+        sdy = dy;
+        const progress = Math.min(Math.abs(dy) / 300, 1);
+        imgEl.style.transform = `translateY(${dy}px) scale(${1 - progress * 0.25})`;
+        overlay.style.background = `rgba(10,8,6,${0.92 * (1 - progress * 0.8)})`;
+      }
+    }, {passive:true});
+
     stage.addEventListener('touchend', ()=>{
       dragging = false;
-      if(sdx < -50) goNext();
-      else if(sdx > 50) goPrev();
+      imgEl.style.transition = '';
+      overlay.style.background = '';
+      if(axis === 'x'){
+        if(sdx < -50) goNext();
+        else if(sdx > 50) goPrev();
+      } else if(axis === 'y'){
+        if(Math.abs(sdy) > 110){
+          // 拖夠遠了，順著拖曳方向飛出去再關閉
+          imgEl.style.transform = `translateY(${sdy > 0 ? 500 : -500}px) scale(0.7)`;
+          imgEl.style.opacity = '0';
+          setTimeout(()=>{
+            close();
+            imgEl.style.transform = '';
+            imgEl.style.opacity = '1';
+          }, 200);
+        } else {
+          imgEl.style.transform = '';
+        }
+      }
     });
   })();
 
@@ -1549,17 +1687,25 @@
   function applyCustomTheme(hex1, hex2, hex3){
     if(!hex1 || !hex2 || !hex3) return; // 空值代表使用預設配色（含自動深色模式），不覆寫
     try{ localStorage.setItem('julian_theme_colors', JSON.stringify({color1:hex1, color2:hex2, color3:hex3})); }catch(err){}
-    const c1 = hexToRgbLocal(hex1), c2 = hexToRgbLocal(hex2), c3 = hexToRgbLocal(hex3);
-    const isLight = luminanceLocal(c3) > 0.5;
+    const c1 = hexToRgbLocal(hex1), c2 = hexToRgbLocal(hex2);
+    const c3Picked = hexToRgbLocal(hex3);
     const black = {r:0,g:0,b:0}, white = {r:255,g:255,b:255};
+
+    // 依照「系統目前是深色還是淺色模式」決定背景要用你選的顏色、還是它的深色版本，
+    // 這樣自訂配色也能跟著系統深淺模式自動切換，不會固定卡在單一模式
+    const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const c3 = systemDark ? mixColorLocal(c3Picked, black, 0.82) : c3Picked;
+    const isLight = !systemDark;
+
     const ink = isLight ? mixColorLocal(c3, black, 0.82) : mixColorLocal(c3, white, 0.9);
     const muted = isLight ? mixColorLocal(c3, black, 0.5) : mixColorLocal(c3, white, 0.55);
     const glassBase = isLight ? white : mixColorLocal(c3, black, 0.4);
 
     const root = document.documentElement.style;
     root.setProperty('--rust', hex1);
+    if(typeof window.setCursorColor === 'function') window.setCursorColor(hex1);
     root.setProperty('--moss', hex2);
-    root.setProperty('--bg-base', hex3);
+    root.setProperty('--bg-base', rgbToHexLocal(c3.r, c3.g, c3.b));
     root.setProperty('--ink', rgbToHexLocal(ink.r, ink.g, ink.b));
     root.setProperty('--muted', rgbToHexLocal(muted.r, muted.g, muted.b));
     root.setProperty('--line', isLight ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.10)');
@@ -1571,7 +1717,19 @@
     root.setProperty('--bg-radial-1', rgbaLocal(c1, 0.55));
     root.setProperty('--bg-radial-2', rgbaLocal(mixColorLocal(c1,c2,0.5), 0.5));
     root.setProperty('--bg-radial-3', rgbaLocal(c2, 0.55));
-    root.setProperty('--bg-radial-4', rgbaLocal(mixColorLocal(c3,c1,0.3), 0.4));
+    root.setProperty('--bg-radial-4', rgbaLocal(mixColorLocal(c3Picked,c1,0.3), 0.4));
+  }
+
+  // 系統深色/淺色模式切換時，如果目前有自訂配色，重新套用一次（換成對應版本）
+  if(window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+      try{
+        const cached = localStorage.getItem('julian_theme_colors');
+        if(!cached) return;
+        const t = JSON.parse(cached);
+        if(t.color1 && t.color2 && t.color3) applyCustomTheme(t.color1, t.color2, t.color3);
+      }catch(err){}
+    });
   }
 
   try{
@@ -1620,8 +1778,10 @@
       preloadImages(list.map(f=> f.imageUrl));
       if(list.length){
         const tileRef = document.getElementById('tileRef');
-        if(tileRef){
-          tileRef.style.backgroundImage = `linear-gradient(180deg, rgba(58,46,34,0) 40%, rgba(58,46,34,.55) 100%), url('${list[0].imageUrl}')`;
+        const tileRefImg = document.getElementById('tileRefImg');
+        if(tileRef && tileRefImg){
+          tileRefImg.onload = ()=> tileRefImg.classList.add('loaded');
+          tileRefImg.src = list[0].imageUrl;
           tileRef.classList.add('has-img');
         }
       }
