@@ -195,9 +195,12 @@
       function rgba(c,a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
       function toHex(r,g,b){ return '#'+[r,g,b].map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join(''); }
 
-      const c1 = hexToRgb(t.color1), c2 = hexToRgb(t.color2), c3 = hexToRgb(t.color3);
-      const isLight = luminance(c3) > 0.5;
+      const c1 = hexToRgb(t.color1), c2 = hexToRgb(t.color2);
+      const c3Picked = hexToRgb(t.color3);
       const black = {r:0,g:0,b:0}, white = {r:255,g:255,b:255};
+      const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const c3 = systemDark ? mix(c3Picked, black, 0.82) : c3Picked;
+      const isLight = !systemDark;
       const ink = isLight ? mix(c3, black, 0.82) : mix(c3, white, 0.9);
       const muted = isLight ? mix(c3, black, 0.5) : mix(c3, white, 0.55);
       const glassBase = isLight ? white : mix(c3, black, 0.4);
@@ -205,7 +208,7 @@
       const root = document.documentElement.style;
       root.setProperty('--rust', t.color1);
       root.setProperty('--moss', t.color2);
-      root.setProperty('--bg-base', t.color3);
+      root.setProperty('--bg-base', toHex(c3.r, c3.g, c3.b));
       root.setProperty('--ink', toHex(ink.r, ink.g, ink.b));
       root.setProperty('--muted', toHex(muted.r, muted.g, muted.b));
       root.setProperty('--line', isLight ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.10)');
@@ -944,16 +947,23 @@
   }
   function rgba(c, a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
 
-  function deriveTheme(hex1, hex2, hex3){
-    const c1 = hexToRgb(hex1), c2 = hexToRgb(hex2), c3 = hexToRgb(hex3);
-    const isLight = luminance(c3) > 0.5;
+  function deriveTheme(hex1, hex2, hex3, systemAware){
+    const c1 = hexToRgb(hex1), c2 = hexToRgb(hex2);
+    const c3Picked = hexToRgb(hex3);
     const black = {r:0,g:0,b:0}, white = {r:255,g:255,b:255};
+    let isLight = luminance(c3Picked) > 0.5;
+    let c3 = c3Picked;
+    if(systemAware && window.matchMedia){
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      isLight = !systemDark;
+      c3 = systemDark ? mixColor(c3Picked, black, 0.82) : c3Picked;
+    }
     const ink = isLight ? mixColor(c3, black, 0.82) : mixColor(c3, white, 0.9);
     const muted = isLight ? mixColor(c3, black, 0.5) : mixColor(c3, white, 0.55);
     const glassBase = isLight ? white : mixColor(c3, black, 0.4);
     return {
       isLight,
-      rust: hex1, moss: hex2, bgBase: hex3,
+      rust: hex1, moss: hex2, bgBase: rgbToHex(c3.r, c3.g, c3.b),
       ink: rgbToHex(ink.r, ink.g, ink.b),
       muted: rgbToHex(muted.r, muted.g, muted.b),
       line: isLight ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.10)',
@@ -965,7 +975,7 @@
       radial1: rgba(c1, 0.55),
       radial2: rgba(mixColor(c1,c2,0.5), 0.5),
       radial3: rgba(c2, 0.55),
-      radial4: rgba(mixColor(c3,c1,0.3), 0.4)
+      radial4: rgba(mixColor(c3Picked,c1,0.3), 0.4)
     };
   }
 
@@ -991,7 +1001,7 @@
       try{ localStorage.removeItem('julian_theme_colors'); }catch(err){}
       return;
     }
-    const t = deriveTheme(hex1, hex2, hex3);
+    const t = deriveTheme(hex1, hex2, hex3, true);
     root.setProperty('--rust', t.rust);
     root.setProperty('--moss', t.moss);
     root.setProperty('--bg-base', t.bgBase);
@@ -1005,6 +1015,17 @@
     root.setProperty('--bg-radial-3', t.radial3);
     root.setProperty('--bg-radial-4', t.radial4);
     try{ localStorage.setItem('julian_theme_colors', JSON.stringify({color1:hex1, color2:hex2, color3:hex3})); }catch(err){}
+  }
+
+  if(window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+      try{
+        const cached = localStorage.getItem('julian_theme_colors');
+        if(!cached) return;
+        const t = JSON.parse(cached);
+        if(t.color1 && t.color2 && t.color3) applyThemeToAdmin(t.color1, t.color2, t.color3);
+      }catch(err){}
+    });
   }
 
   function initThemeColors(){
