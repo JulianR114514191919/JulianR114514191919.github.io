@@ -188,10 +188,6 @@
         return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
       }
       function mix(c1,c2,t){ return { r:c1.r+(c2.r-c1.r)*t, g:c1.g+(c2.g-c1.g)*t, b:c1.b+(c2.b-c1.b)*t }; }
-      function luminance(c){
-        const a=[c.r,c.g,c.b].map(v=>{ v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); });
-        return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2];
-      }
       function rgba(c,a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
       function toHex(r,g,b){ return '#'+[r,g,b].map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join(''); }
 
@@ -464,7 +460,6 @@
     getStorage, ref, uploadBytes, getDownloadURL, deleteObject
   } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
 
-  // ⚠️ 把這裡換成你自己 Firebase 專案的設定值
   const firebaseConfig = {
     apiKey: "AIzaSyAfyM4g54lnJh3mQhJ3zU50U75mB_04MHk",
     authDomain: "julian-site-c5dd3.firebaseapp.com",
@@ -499,7 +494,7 @@
   document.getElementById('logoutBtn').addEventListener('click', ()=> signOut(auth));
 
   onAuthStateChanged(auth, (user)=>{
-    if(user && (ALLOWED_UID === 'PASTE_YOUR_UID_HERE' || user.uid === ALLOWED_UID)){
+    if(user && user.uid === ALLOWED_UID){
       loginView.style.display = 'none';
       appView.style.display = 'block';
       document.getElementById('userAvatar').src = user.photoURL || '';
