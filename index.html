@@ -18,6 +18,10 @@
 <meta name="twitter:title" content="Julian 🦊">
 <meta name="twitter:description" content="紫毛狐狸．攝影師．快門自由">
 
+<!-- 手機瀏覽器網址列/狀態列顏色（跟隨系統深淺模式） -->
+<meta name="theme-color" content="#EFE4D2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16120E" media="(prefers-color-scheme: dark)">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://novatorem-39a6-nine.vercel.app">
@@ -120,6 +124,7 @@
     animation: rise .6s var(--ease) both;
     transform: translateZ(0);
     backface-visibility: hidden;
+    filter: blur(0px); /* 翻頁模糊效果的初始值，transition 一併寫在下一行 */
     transition: filter .38s ease, transform .16s var(--ease);
   }
   .glass.pressed{ transform: translateZ(0) scale(0.97); }
@@ -135,9 +140,6 @@
   }
   .glass.frosting{ animation: cardfrost .32s ease; will-change: opacity, transform; }
 
-  /* 被滑走的那一頁的模糊、以及卡片按壓回饋，transition 已經合併寫在主要 .glass 規則裡 */
-  .glass{ filter: blur(0px); }
-
   #p1 .glass, #p1clone .glass{ text-align:center; }
   .avatar{
     width:92px; height:92px; border-radius:50%; margin:0 auto 8px;
@@ -146,7 +148,7 @@
   }
   .avatar img{
     width:100%; height:100%; border-radius:50%; object-fit:cover; border:3px solid var(--glass-strong); display:block; pointer-events:none;
-    transition: opacity .25s ease;
+    transition: opacity .14s ease;
   }
   .pfp-credit{ font-size:9.5px; color:var(--muted); font-weight:600; opacity:.7; margin-bottom:14px; min-height:12px; }
 
@@ -233,9 +235,6 @@
   .about-tile .ic{ font-size:20px; margin-bottom:4px; }
   .about-tile .tt{ font-size:13px; font-weight:800; }
   .about-tile .dd{ font-size:10px; color:var(--muted); font-weight:600; margin-top:2px; }
-  .about-tile.ref{
-    background-color: var(--glass-strong);
-  }
   .about-tile-img{
     position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 20%;
     z-index:0; opacity:0; transition: opacity .3s ease; transform: translateZ(0);
@@ -461,10 +460,6 @@
         return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
       }
       function mix(c1,c2,t){ return { r:c1.r+(c2.r-c1.r)*t, g:c1.g+(c2.g-c1.g)*t, b:c1.b+(c2.b-c1.b)*t }; }
-      function luminance(c){
-        const a=[c.r,c.g,c.b].map(v=>{ v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); });
-        return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2];
-      }
       function rgba(c,a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
       function toHex(r,g,b){ return '#'+[r,g,b].map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join(''); }
 
@@ -1044,7 +1039,7 @@
     styleTag.textContent = `
       a, button, .about-tile, .pin, .dot, .cal-cell, .cal-nav-btn,
       .lightbox-nav, .lightbox-close, .modal-close, .cal-handle,
-      .albumbtn, .np-listen-btn, .tab, .avatar, .links a {
+      .albumbtn, .np-listen-btn, .avatar, .links a {
         cursor: ${pointerUri} !important;
       }
     `;
@@ -1196,7 +1191,7 @@
     let html = `<div class="modal-title">設定圖</div>`;
     if(list){
       html += list.map((f, idx) => `
-        <img class="modal-img" data-idx="${idx}" style="cursor:pointer;" src="${f.imageUrl}" alt="">
+        <img class="modal-img" data-idx="${idx}" style="cursor:pointer;" src="${f.imageUrl}" alt="" loading="lazy">
         <div style="font-size:12px; color:var(--muted); font-weight:600; margin:6px 0 16px;">${f.label ? f.label.replace(/</g,'&lt;') : ''}</div>
       `).join('');
     } else {
@@ -1436,7 +1431,7 @@
     }
     const html = photos.map(p => `
       <div class="pin">
-        <img src="${p.imageUrl}" alt="${escapeHtml(p.caption||'')}" decoding="async">
+        <img src="${p.imageUrl}" alt="${escapeHtml(p.caption||'')}" decoding="async" loading="lazy">
         ${p.caption ? `<div class="cap">${escapeHtml(p.caption)}</div>` : ''}
       </div>
     `).join('');
@@ -1464,16 +1459,24 @@
     let idx = 0;
     let currentList = [];
 
-    function render(){
+    function render(instant){
       const list = currentList;
       if(!list.length) return;
       const p = list[idx];
-      imgEl.style.opacity = '0';
-      setTimeout(()=>{
+      if(instant){
+        // 第一次開啟：直接換成正確的圖，不要有延遲（不然會看到上一次殘留在元素裡的舊圖畫面）
         imgEl.src = p.imageUrl;
         imgEl.alt = p.caption || '';
         imgEl.style.opacity = '1';
-      }, 120);
+      } else {
+        // 左右切換照片時：才需要平滑的淡出→換圖→淡入過場
+        imgEl.style.opacity = '0';
+        setTimeout(()=>{
+          imgEl.src = p.imageUrl;
+          imgEl.alt = p.caption || '';
+          imgEl.style.opacity = '1';
+        }, 120);
+      }
       capEl.textContent = p.caption || '';
       counterEl.textContent = list.length > 1 ? `${idx + 1} / ${list.length}` : '';
       prevBtn.disabled = idx === 0;
@@ -1487,7 +1490,13 @@
       currentList = list || window.lightboxPhotos || [];
       if(!currentList.length) return;
       idx = Math.max(0, Math.min(i, currentList.length - 1));
-      render();
+      // 每次開啟前先強制歸零，避免上次關閉動畫還沒收尾乾淨的殘留狀態影響這次
+      imgEl.style.transition = 'none';
+      imgEl.style.transform = '';
+      imgEl.style.opacity = '1';
+      void imgEl.offsetWidth;
+      imgEl.style.transition = '';
+      render(true);
       overlay.classList.add('open');
     };
     function close(){ overlay.classList.remove('open'); }
@@ -1498,6 +1507,7 @@
     prevBtn.addEventListener('click', goPrev);
     nextBtn.addEventListener('click', goNext);
     overlay.addEventListener('click', e=>{ if(e.target === overlay) close(); });
+    stage.addEventListener('click', e=>{ if(e.target === stage) close(); });
 
     window.addEventListener('keydown', e=>{
       if(!overlay.classList.contains('open')) return;
@@ -1534,22 +1544,28 @@
 
     stage.addEventListener('touchend', ()=>{
       dragging = false;
-      imgEl.style.transition = '';
       overlay.style.background = '';
       if(axis === 'x'){
+        imgEl.style.transition = '';
         if(sdx < -50) goNext();
         else if(sdx > 50) goPrev();
       } else if(axis === 'y'){
         if(Math.abs(sdy) > 110){
-          // 拖夠遠了，順著拖曳方向飛出去再關閉
+          // 拖夠遠了，順著拖曳方向飛出去
+          imgEl.style.transition = 'transform .22s ease, opacity .22s ease';
           imgEl.style.transform = `translateY(${sdy > 0 ? 500 : -500}px) scale(0.7)`;
           imgEl.style.opacity = '0';
           setTimeout(()=>{
-            close();
-            imgEl.style.transform = '';
-            imgEl.style.opacity = '1';
-          }, 200);
+            close(); // 讓整個燈箱（含背景遮罩）開始淡出，這時圖片飛出去的動畫已經跑完、畫面上已經看不到圖片本身了
+            setTimeout(()=>{
+              // 等燈箱完全淡出、確定看不見了，才悄悄把圖片復位，不會有任何閃爍
+              imgEl.style.transition = 'none';
+              imgEl.style.transform = '';
+              imgEl.style.opacity = '1';
+            }, 320);
+          }, 230);
         } else {
+          imgEl.style.transition = '';
           imgEl.style.transform = '';
         }
       }
@@ -1605,7 +1621,7 @@
       if(cloneImg) cloneImg.src = a.imageUrl;
       if(clonePfp) clonePfp.textContent = a.artist ? `PFP by ${a.artist}` : '';
       if(typeof window.setFavicon === 'function') window.setFavicon(a.imageUrl);
-    }, 150);
+    }, 70);
   }
 
   window.cycleAvatar = function(){
@@ -1674,10 +1690,6 @@
   }
   function mixColorLocal(c1, c2, t){
     return { r:c1.r+(c2.r-c1.r)*t, g:c1.g+(c2.g-c1.g)*t, b:c1.b+(c2.b-c1.b)*t };
-  }
-  function luminanceLocal(c){
-    const a = [c.r,c.g,c.b].map(v=>{ v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); });
-    return 0.2126*a[0] + 0.7152*a[1] + 0.0722*a[2];
   }
   function rgbaLocal(c, a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
   function rgbToHexLocal(r,g,b){
@@ -1827,7 +1839,7 @@
       card.style.display = 'flex';
       if(listenBtn) listenBtn.style.display = 'flex';
 
-      const progressRow = document.getElementById('npProgressRow' + suf) || document.querySelector('#p1 .np-progress-row');
+      const progressRow = document.getElementById('npProgressRow' + suf);
       const pauseBadge = document.getElementById('npPauseBadge' + suf);
 
       if(npData.is_last_played){
