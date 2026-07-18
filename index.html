@@ -962,11 +962,12 @@
   void track.offsetWidth;
   track.style.transition = '';
 
-  // ---------- 停留提示：第一頁待太久沒動作，下一頁輕輕探頭提示還有內容 ----------
-  let hintShown = false;
+  // ---------- 停留提示 ----------
+  // 進到頁面後只要「完全沒有任何動作」，每 5 秒下一頁就輕輕探頭提示一次；
+  // 只要使用者做過任何動作（點擊、觸碰、鍵盤、滾輪），提示就永久取消不再出現
+  let hintCancelled = false;
   function showNextPagePeek(){
-    if(hintShown || current !== 0 || looping || isDragging || calOpen) return;
-    hintShown = true;
+    if(hintCancelled || current !== 0 || looping || isDragging || calOpen) return;
     const base = (current + 1) * SLIDE;
     track.style.transform = `translateX(calc(-${base}% - 28px))`;
     setTimeout(()=>{
@@ -975,8 +976,16 @@
       }
     }, 480);
   }
-  let hintTimer = setTimeout(showNextPagePeek, 4000);
-  function cancelHintTimer(){ clearTimeout(hintTimer); hintShown = true; }
+  let hintTimer = setInterval(showNextPagePeek, 5000);
+  function cancelHintTimer(){
+    if(hintCancelled) return;
+    hintCancelled = true;
+    clearInterval(hintTimer);
+  }
+  // 用 capture 監聽整個視窗的第一個動作，就算元素內部有 stopPropagation（例如頭貼）也攔得到
+  ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(ev=>
+    window.addEventListener(ev, cancelHintTimer, { capture:true, passive:true, once:true })
+  );
 
   window.addEventListener('keydown', e=>{
     if(calOpen){
@@ -1068,8 +1077,9 @@
     try{ if(navigator.vibrate) navigator.vibrate(40); }catch(err){}
     clickCount = 0;
     if(window.eggConfig.avatar){
-      avatarImg.src = window.eggConfig.avatar;
-      window.setFavicon(window.eggConfig.avatar);
+      const eggSrc = window.cachedSrc ? window.cachedSrc(window.eggConfig.avatar) : window.eggConfig.avatar;
+      avatarImg.src = eggSrc;
+      window.setFavicon(eggSrc);
     }
     avatarImg.style.opacity = '1';
     const pfpEl = document.getElementById('pfpCredit');
@@ -1191,7 +1201,7 @@
     let html = `<div class="modal-title">設定圖</div>`;
     if(list){
       html += list.map((f, idx) => `
-        <img class="modal-img" data-idx="${idx}" style="cursor:pointer;" src="${f.imageUrl}" alt="" loading="lazy">
+        <img class="modal-img" data-idx="${idx}" style="cursor:pointer;" src="${window.cachedSrc ? window.cachedSrc(f.imageUrl) : f.imageUrl}" alt="" loading="lazy">
         <div style="font-size:12px; color:var(--muted); font-weight:600; margin:6px 0 16px;">${f.label ? f.label.replace(/</g,'&lt;') : ''}</div>
       `).join('');
     } else {
@@ -1220,7 +1230,13 @@
     const list = (window.fursonaList || []).map(f => ({ imageUrl: f.imageUrl, caption: f.label || '' }));
     document.querySelectorAll('#modalBody .modal-img[data-idx]').forEach(img=>{
       img.addEventListener('click', ()=>{
-        if(typeof window.openLightbox === 'function') window.openLightbox(parseInt(img.dataset.idx, 10), list);
+        if(typeof window.openLightbox === 'function'){
+          window.openLightbox(
+            parseInt(img.dataset.idx, 10),
+            list,
+            ix => document.querySelectorAll('#modalBody .modal-img')[ix] // 關閉時縮回彈窗裡對應那張設定圖
+          );
+        }
       });
     });
   });
@@ -1431,7 +1447,7 @@
     }
     const html = photos.map(p => `
       <div class="pin">
-        <img src="${p.imageUrl}" alt="${escapeHtml(p.caption||'')}" decoding="async" loading="lazy">
+        <img src="${cachedSrc(p.imageUrl)}" alt="${escapeHtml(p.caption||'')}" decoding="async" loading="lazy">
         ${p.caption ? `<div class="cap">${escapeHtml(p.caption)}</div>` : ''}
       </div>
     `).join('');
@@ -1458,6 +1474,7 @@
 
     let idx = 0;
     let currentList = [];
+    let sourceGetter = null; // 依目前索引找到「原本那張縮圖」的函式，關閉動畫要縮回去的目標
 
     function render(instant){
       const list = currentList;
@@ -1465,14 +1482,14 @@
       const p = list[idx];
       if(instant){
         // 第一次開啟：直接換成正確的圖，不要有延遲（不然會看到上一次殘留在元素裡的舊圖畫面）
-        imgEl.src = p.imageUrl;
+        imgEl.src = cachedSrc(p.imageUrl);
         imgEl.alt = p.caption || '';
         imgEl.style.opacity = '1';
       } else {
         // 左右切換照片時：才需要平滑的淡出→換圖→淡入過場
         imgEl.style.opacity = '0';
         setTimeout(()=>{
-          imgEl.src = p.imageUrl;
+          imgEl.src = cachedSrc(p.imageUrl);
           imgEl.alt = p.caption || '';
           imgEl.style.opacity = '1';
         }, 120);
@@ -1486,14 +1503,17 @@
     }
 
     // list 參數可省略：省略時沿用照片牆清單（維持原本呼叫方式相容）
-    window.openLightbox = function(i, list){
+    // getSourceEl：給定索引回傳對應縮圖元素，關閉時圖片會縮回那個位置（仿 iOS 回主畫面）
+    window.openLightbox = function(i, list, getSourceEl){
       currentList = list || window.lightboxPhotos || [];
       if(!currentList.length) return;
+      sourceGetter = getSourceEl || (ix => masonryMain.querySelectorAll('.pin img')[ix]);
       idx = Math.max(0, Math.min(i, currentList.length - 1));
       // 每次開啟前先強制歸零，避免上次關閉動畫還沒收尾乾淨的殘留狀態影響這次
       imgEl.style.transition = 'none';
       imgEl.style.transform = '';
       imgEl.style.opacity = '1';
+      imgEl.style.borderRadius = '';
       void imgEl.offsetWidth;
       imgEl.style.transition = '';
       render(true);
@@ -1516,8 +1536,49 @@
       if(e.key === 'ArrowRight') goNext();
     });
 
-    // 左右滑動切換照片；上下拖曳（仿 Apple 相簿）可以直接關閉
+    // 左右滑動切換照片；往上下（或任意方向）拖曳可以關閉——
+    // 放開時圖片會「縮小飛回原本那張縮圖的位置」，類似 iOS App 返回主畫面的動畫
     let sx = 0, sy = 0, sdx = 0, sdy = 0, dragging = false, axis = null;
+
+    function dismissToSource(){
+      // 先量出圖片「沒有任何 transform」時的原始位置（同一個 frame 內量完就還原，畫面不會閃）
+      const heldTransform = imgEl.style.transform;
+      imgEl.style.transition = 'none';
+      imgEl.style.transform = '';
+      const base = imgEl.getBoundingClientRect();
+      imgEl.style.transform = heldTransform;
+      void imgEl.offsetWidth;
+
+      // 找目前這張照片對應的縮圖；找不到或縮圖不在畫面上時，退回「原地縮小淡出」
+      let target = null;
+      const srcEl = sourceGetter ? sourceGetter(idx) : null;
+      if(srcEl){
+        const r = srcEl.getBoundingClientRect();
+        if(r.width > 4 && r.height > 4 && r.bottom > 0 && r.top < window.innerHeight) target = r;
+      }
+
+      imgEl.style.transition = 'transform .34s cubic-bezier(0.32,0.72,0,1), opacity .26s ease .12s, border-radius .34s ease';
+      if(target){
+        const s = Math.max(target.width / base.width, 0.05);
+        const tx = (target.left + target.width/2) - (base.left + base.width/2);
+        const ty = (target.top + target.height/2) - (base.top + base.height/2);
+        imgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+        imgEl.style.borderRadius = `${Math.min(16 / s, base.width / 2)}px`; // 縮到底時圓角視覺上貼近縮圖
+      } else {
+        imgEl.style.transform = `translate(${sdx}px, ${sdy}px) scale(0.25)`;
+      }
+      imgEl.style.opacity = '0';
+      close(); // 背景遮罩同步淡出
+
+      setTimeout(()=>{
+        // 等整個燈箱完全看不見了，才悄悄復位，不會有任何閃爍
+        overlay.style.background = '';
+        imgEl.style.transition = 'none';
+        imgEl.style.transform = '';
+        imgEl.style.opacity = '1';
+        imgEl.style.borderRadius = '';
+      }, 400);
+    }
 
     stage.addEventListener('touchstart', e=>{
       sx = e.touches[0].clientX; sy = e.touches[0].clientY;
@@ -1535,39 +1596,32 @@
       if(axis === 'x'){
         sdx = dx;
       } else {
-        sdy = dy;
-        const progress = Math.min(Math.abs(dy) / 300, 1);
-        imgEl.style.transform = `translateY(${dy}px) scale(${1 - progress * 0.25})`;
+        // 拖曳關閉模式：圖片完全跟著手指跑（上下左右都行），拖越遠縮越小、背景越透
+        sdx = dx; sdy = dy;
+        const progress = Math.min(Math.hypot(dx, dy) / 300, 1);
+        imgEl.style.transform = `translate(${dx}px, ${dy}px) scale(${1 - progress * 0.3})`;
         overlay.style.background = `rgba(10,8,6,${0.92 * (1 - progress * 0.8)})`;
       }
     }, {passive:true});
 
     stage.addEventListener('touchend', ()=>{
       dragging = false;
-      overlay.style.background = '';
       if(axis === 'x'){
+        overlay.style.background = '';
         imgEl.style.transition = '';
         if(sdx < -50) goNext();
         else if(sdx > 50) goPrev();
       } else if(axis === 'y'){
-        if(Math.abs(sdy) > 110){
-          // 拖夠遠了，順著拖曳方向飛出去
-          imgEl.style.transition = 'transform .22s ease, opacity .22s ease';
-          imgEl.style.transform = `translateY(${sdy > 0 ? 500 : -500}px) scale(0.7)`;
-          imgEl.style.opacity = '0';
-          setTimeout(()=>{
-            close(); // 讓整個燈箱（含背景遮罩）開始淡出，這時圖片飛出去的動畫已經跑完、畫面上已經看不到圖片本身了
-            setTimeout(()=>{
-              // 等燈箱完全淡出、確定看不見了，才悄悄把圖片復位，不會有任何閃爍
-              imgEl.style.transition = 'none';
-              imgEl.style.transform = '';
-              imgEl.style.opacity = '1';
-            }, 320);
-          }, 230);
+        if(Math.hypot(sdx, sdy) > 90){
+          dismissToSource(); // 拖夠遠：縮小飛回原縮圖
         } else {
+          // 沒拖夠遠：彈回原位
+          overlay.style.background = '';
           imgEl.style.transition = '';
           imgEl.style.transform = '';
         }
+      } else {
+        overlay.style.background = '';
       }
     });
   })();
@@ -1579,6 +1633,7 @@
       onSnapshot(q, (snap)=>{
         const photos = [];
         snap.forEach(d=> photos.push(d.data()));
+        cacheImages(photos.map(p=> p.imageUrl)); // 照片全部暫存，燈箱重開、循環翻頁都不再重新下載
         renderGallery(photos);
       }, ()=>{
         masonryMain.innerHTML = '<div class="cal-empty">還沒有上傳照片，敬請期待</div>';
@@ -1613,14 +1668,14 @@
       // 如果這段等待期間又觸發了更新的請求（連點太快）或彩蛋已經啟動，這次的結果就作廢
       if(myToken !== avatarSwapToken) return;
       if(window.eggStage && window.eggStage !== 0) return;
-      avatarImgEl.src = a.imageUrl;
+      avatarImgEl.src = cachedSrc(a.imageUrl);
       pfpCreditEl.textContent = a.artist ? `PFP by ${a.artist}` : '';
       avatarImgEl.style.opacity = '1';
       const cloneImg = document.getElementById('avatarImgClone');
       const clonePfp = document.getElementById('pfpCreditClone');
-      if(cloneImg) cloneImg.src = a.imageUrl;
+      if(cloneImg) cloneImg.src = cachedSrc(a.imageUrl);
       if(clonePfp) clonePfp.textContent = a.artist ? `PFP by ${a.artist}` : '';
-      if(typeof window.setFavicon === 'function') window.setFavicon(a.imageUrl);
+      if(typeof window.setFavicon === 'function') window.setFavicon(cachedSrc(a.imageUrl));
     }, 70);
   }
 
@@ -1634,13 +1689,23 @@
     applyAvatar();
   };
 
-  function preloadImages(urls){
+  /* ---- 圖片暫存：每張圖只下載一次，存成本地 blob 網址 ----
+     之後不管頭貼循環到第幾輪、燈箱重複開幾次，都直接用暫存的版本，不會再向伺服器重新下載 */
+  const imgCache = new Map();       // 原始網址 -> 本地 blob 網址（下載完成後才寫入）
+  const imgCacheLoading = new Set();
+  function cacheImages(urls){
     urls.forEach(url=>{
-      if(!url) return;
-      const img = new Image();
-      img.src = url;
+      if(!url || imgCache.has(url) || imgCacheLoading.has(url)) return;
+      imgCacheLoading.add(url);
+      fetch(url)
+        .then(r=> r.ok ? r.blob() : Promise.reject())
+        .then(b=>{ imgCache.set(url, URL.createObjectURL(b)); })
+        .catch(()=>{})                       // 下載失敗就算了，之後會直接用原網址顯示
+        .finally(()=> imgCacheLoading.delete(url));
     });
   }
+  function cachedSrc(url){ return imgCache.get(url) || url || ''; }
+  window.cachedSrc = cachedSrc; // 給非 module 區塊（彩蛋、設定圖彈窗）共用
 
   try{
     const avatarQ = query(collection(db, 'avatars'), orderBy('order', 'asc'));
@@ -1649,7 +1714,7 @@
       snap.forEach(d=> list.push(d.data()));
       window.avatarLib = list;
       if(window.avatarIndex >= list.length) window.avatarIndex = 0;
-      preloadImages(list.map(a=> a.imageUrl));
+      cacheImages(list.map(a=> a.imageUrl));
       applyAvatar();
     }, ()=>{ applyAvatar(); });
   }catch(err){
@@ -1768,7 +1833,7 @@
       const d = snap.data();
       if(d.stage1AvatarUrl){
         window.eggConfig.avatar = d.stage1AvatarUrl;
-        preloadImages([d.stage1AvatarUrl]);
+        cacheImages([d.stage1AvatarUrl]);
       }
       if(d.stage1SoundUrl){
         window.eggConfig.sound = d.stage1SoundUrl;
@@ -1787,13 +1852,13 @@
       const list = [];
       snap.forEach(d=> list.push(d.data()));
       window.fursonaList = list;
-      preloadImages(list.map(f=> f.imageUrl));
+      cacheImages(list.map(f=> f.imageUrl));
       if(list.length){
         const tileRef = document.getElementById('tileRef');
         const tileRefImg = document.getElementById('tileRefImg');
         if(tileRef && tileRefImg){
           tileRefImg.onload = ()=> tileRefImg.classList.add('loaded');
-          tileRefImg.src = list[0].imageUrl;
+          tileRefImg.src = cachedSrc(list[0].imageUrl);
           tileRef.classList.add('has-img');
         }
       }
