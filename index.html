@@ -1716,23 +1716,39 @@
     applyAvatar();
   };
 
-  /* ---- 圖片暫存：每張圖只下載一次，存成本地 blob 網址 ----
-     之後不管頭貼循環到第幾輪、燈箱重複開幾次，都直接用暫存的版本，不會再向伺服器重新下載 */
-  const imgCache = new Map();       // 原始網址 -> 本地 blob 網址（下載完成後才寫入）
-  const imgCacheLoading = new Set();
+  /* ---- 圖片預載：開站後在背景一張一張讓瀏覽器抓進 HTTP 快取 ----
+     檔案的快取設定已由後台「快取修復」補上（一年），所以只需輕量預載即可；
+     之前用 fetch 抓 blob 的做法會被 CORS 擋下但頻寬照樣消耗，等於每張圖下載兩次、
+     把頻寬塞爆拖慢整站，已改掉 */
+  const _preloadSeen = new Set();
+  const _preloadQueue = [];
+  let _preloadStarted = false;
+  let _preloadActive = false;
+  function pumpPreload(){
+    if(_preloadActive || !_preloadStarted) return;
+    const url = _preloadQueue.shift();
+    if(!url) return;
+    _preloadActive = true;
+    const img = new Image();
+    const done = ()=>{ _preloadActive = false; setTimeout(pumpPreload, 50); }; // 一張接一張，不跟畫面上的圖搶頻寬
+    img.onload = done; img.onerror = done;
+    img.src = url;
+  }
   function cacheImages(urls){
     urls.forEach(url=>{
-      if(!url || imgCache.has(url) || imgCacheLoading.has(url)) return;
-      imgCacheLoading.add(url);
-      fetch(url)
-        .then(r=> r.ok ? r.blob() : Promise.reject())
-        .then(b=>{ imgCache.set(url, URL.createObjectURL(b)); })
-        .catch(()=>{})                       // 下載失敗就算了，之後會直接用原網址顯示
-        .finally(()=> imgCacheLoading.delete(url));
+      if(!url || _preloadSeen.has(url)) return;
+      _preloadSeen.add(url);
+      _preloadQueue.push(url);
     });
+    pumpPreload();
   }
-  function cachedSrc(url){ return imgCache.get(url) || url || ''; }
-  window.cachedSrc = cachedSrc; // 給非 module 區塊（彩蛋、設定圖彈窗）共用
+  function startPreload(){ _preloadStarted = true; pumpPreload(); }
+  // 等頁面完全載好再開始，別跟開場動畫和第一屏的圖搶
+  if(document.readyState === 'complete') setTimeout(startPreload, 800);
+  else window.addEventListener('load', ()=> setTimeout(startPreload, 800));
+
+  function cachedSrc(url){ return url || ''; } // 直接回原網址，靠瀏覽器 HTTP 快取（後台已設定一年）
+  window.cachedSrc = cachedSrc;
 
   try{
     const avatarQ = query(collection(db, 'avatars'), orderBy('order', 'asc'));
