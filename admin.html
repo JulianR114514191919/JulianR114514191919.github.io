@@ -315,13 +315,13 @@
       <div class="card">
         <h2>上傳照片</h2>
         <label class="upload-zone" id="uploadZone">
-          📷 點擊選擇照片上傳
-          <input type="file" id="photoInput" accept="image/*">
+          📷 點擊選擇照片（可一次選多張）
+          <input type="file" id="photoInput" accept="image/*,.jxl,.tif,.tiff" multiple>
         </label>
-        <label>圖說（選填）</label>
-        <input type="text" id="photoCaption" placeholder="這張照片的說明">
+        <label>圖說（選填，套用到這批全部照片）</label>
+        <input type="text" id="photoCaption" placeholder="這批照片的說明">
         <button class="btn btn-primary btn-block" id="uploadBtn">確認上傳</button>
-        <div class="spinner" id="uploadSpinner" style="display:none;">上傳中…</div>
+        <div id="uploadProgress" style="display:none; margin-top:10px; font-size:12px; line-height:1.9; color:var(--muted); word-break:break-all;"></div>
       </div>
       <div class="card">
         <h2>目前照片</h2>
@@ -412,6 +412,13 @@
       </div>
 
       <div class="card">
+        <h2>圖片快取修復（一次性）</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">把「這顆按鈕出現之前」上傳的舊圖片／音效補上瀏覽器快取設定，修好前台切換頭貼會延遲的問題。之後新上傳的檔案會自動帶快取設定，按過一次就不用再按。</p>
+        <button class="btn btn-primary btn-block" id="fixCacheBtn">開始修復舊檔案快取</button>
+        <div class="spinner" id="fixCacheStatus" style="display:none;"></div>
+      </div>
+
+      <div class="card">
         <h2>網站配色</h2>
         <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">選 3 個顏色，網站會自動根據這 3 色算出整套配色（文字、邊框、毛玻璃、背景漸層），類似 Android Material You 的概念。</p>
 
@@ -457,7 +464,7 @@
     query, orderBy, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import {
-    getStorage, ref, uploadBytes, getDownloadURL, deleteObject
+    getStorage, ref, uploadBytes, getDownloadURL, deleteObject, updateMetadata
   } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
 
   const firebaseConfig = {
@@ -477,6 +484,10 @@
   const db = getFirestore(app);
   const storage = getStorage(app);
   const provider = new GoogleAuthProvider();
+
+  // 所有上傳檔案共用的快取設定：檔名帶時間戳記、內容永不變動，
+  // 讓瀏覽器放心快取一年，前台切換頭貼/開燈箱不用每次重新下載
+  const IMG_CACHE_META = { cacheControl: 'public, max-age=31536000, immutable' };
 
   const loginView = document.getElementById('loginView');
   const appView = document.getElementById('appView');
@@ -507,6 +518,7 @@
       initEggSettings();
       initAboutModals();
       initThemeColors();
+      initFixCache();
     } else if(user){
       // 登入了但不是你本人
       loginError.style.display = 'block';
@@ -650,7 +662,7 @@
 
         const path = `avatars/${Date.now()}_${selectedAvatarFile.name}`;
         const sRef = ref(storage, path);
-        await uploadBytes(sRef, selectedAvatarFile);
+        await uploadBytes(sRef, selectedAvatarFile, IMG_CACHE_META);
         const url = await getDownloadURL(sRef);
         await addDoc(colRef, {
           imageUrl: url,
@@ -690,42 +702,153 @@
         `;
         el.querySelector('.del-btn').addEventListener('click', async ()=>{
           try{ if(p.storagePath) await deleteObject(ref(storage, p.storagePath)); }catch(e){}
+          try{ if(p.originalPath) await deleteObject(ref(storage, p.originalPath)); }catch(e){}
           await deleteDoc(doc(db,'gallery', d.id));
         });
         list.appendChild(el);
       });
     });
 
-    let selectedFile = null;
-    document.getElementById('photoInput').addEventListener('change', (e)=>{
-      selectedFile = e.target.files[0] || null;
-      document.getElementById('uploadZone').textContent = selectedFile ? `已選擇：${selectedFile.name}` : '📷 點擊選擇照片上傳';
+    // 把任何圖檔解碼後轉成 WebP 縮圖（最長邊 1600px）。
+    // 解碼順序：瀏覽器原生（JPEG/PNG/WebP/AVIF…）→ TIFF 解碼器 → JPEG XL 解碼器。
+    // 全部失敗會回傳 null，該張照片不會發布——保證照片牆上永遠只有 WebP。
+    async function decodeToCanvas(file){
+      const MAX = 1600;
+      const drawScaled = (srcW, srcH, drawFn)=>{
+        const scale = Math.min(1, MAX / Math.max(srcW, srcH));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(srcW * scale);
+        canvas.height = Math.round(srcH * scale);
+        drawFn(canvas.getContext('2d'), canvas.width, canvas.height);
+        return canvas;
+      };
+
+      // 1) 瀏覽器原生解碼
+      try{
+        const bmp = await createImageBitmap(file);
+        const c = drawScaled(bmp.width, bmp.height, (ctx, w, h)=> ctx.drawImage(bmp, 0, 0, w, h));
+        bmp.close();
+        return c;
+      }catch(err){}
+
+      const name = (file.name || '').toLowerCase();
+      // ImageData 是全尺寸的，先畫到全尺寸 canvas 再縮
+      const fromImageData = (imageData)=>{
+        const full = document.createElement('canvas');
+        full.width = imageData.width; full.height = imageData.height;
+        full.getContext('2d').putImageData(imageData, 0, 0);
+        return drawScaled(full.width, full.height, (ctx, w, h)=> ctx.drawImage(full, 0, 0, w, h));
+      };
+
+      // 2) TIFF（瀏覽器不認得，用 UTIF 解碼器現場載入）
+      if(file.type === 'image/tiff' || /\.tiff?$/.test(name)){
+        try{
+          const mod = await import('https://cdn.jsdelivr.net/npm/utif2@4.1.0/+esm');
+          const UTIF = mod.default || mod;
+          const buf = await file.arrayBuffer();
+          const ifds = UTIF.decode(buf);
+          UTIF.decodeImage(buf, ifds[0]);
+          const rgba = UTIF.toRGBA8(ifds[0]);
+          return fromImageData(new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height));
+        }catch(err){ console.warn('TIFF 解碼失敗', err); }
+      }
+
+      // 3) JPEG XL（用 WASM 解碼器現場載入）
+      if(file.type === 'image/jxl' || /\.jxl$/.test(name)){
+        try{
+          const { decode } = await import('https://cdn.jsdelivr.net/npm/@jsquash/jxl@1/+esm');
+          const imageData = await decode(await file.arrayBuffer());
+          return fromImageData(imageData);
+        }catch(err){ console.warn('JPEG XL 解碼失敗', err); }
+      }
+
+      return null;
+    }
+
+    async function makeWebpThumb(file){
+      const canvas = await decodeToCanvas(file);
+      if(!canvas) return null;
+      const blob = await new Promise(res=> canvas.toBlob(res, 'image/webp', 0.82));
+      // 少數瀏覽器（如 Safari）不支援輸出 WebP，會拿到 null 或別的格式，就退回 JPEG
+      if(blob && blob.type === 'image/webp') return { blob, ext: 'webp', type: 'image/webp' };
+      const jpg = await new Promise(res=> canvas.toBlob(res, 'image/jpeg', 0.85));
+      return jpg ? { blob: jpg, ext: 'jpg', type: 'image/jpeg' } : null;
+    }
+
+    let selectedFiles = [];
+    const photoInput = document.getElementById('photoInput');
+    const uploadZone = document.getElementById('uploadZone');
+    const progressEl = document.getElementById('uploadProgress');
+
+    photoInput.addEventListener('change', (e)=>{
+      selectedFiles = [...(e.target.files || [])];
+      uploadZone.textContent = selectedFiles.length
+        ? `已選擇 ${selectedFiles.length} 張：${selectedFiles.map(f=>f.name).join('、')}`
+        : '📷 點擊選擇照片（可一次選多張）';
     });
 
     document.getElementById('uploadBtn').onclick = async ()=>{
-      if(!selectedFile) return;
-      const spinner = document.getElementById('uploadSpinner');
-      spinner.style.display = 'block';
-      try{
-        const path = `gallery/${Date.now()}_${selectedFile.name}`;
-        const sRef = ref(storage, path);
-        await uploadBytes(sRef, selectedFile);
-        const url = await getDownloadURL(sRef);
-        await addDoc(colRef, {
-          imageUrl: url,
-          storagePath: path,
-          caption: document.getElementById('photoCaption').value.trim(),
-          uploadedAt: serverTimestamp()
-        });
-        document.getElementById('photoCaption').value = '';
-        document.getElementById('photoInput').value = '';
-        document.getElementById('uploadZone').textContent = '📷 點擊選擇照片上傳';
-        selectedFile = null;
-      }catch(err){
-        console.error(err);
-        alert('上傳失敗，請再試一次');
+      if(!selectedFiles.length) return;
+      const files = selectedFiles;
+      const caption = document.getElementById('photoCaption').value.trim();
+      // 立刻釋放選擇器：這批在背景跑的同時，馬上就能再選下一批
+      selectedFiles = [];
+      photoInput.value = '';
+      uploadZone.textContent = '📷 點擊選擇照片（可一次選多張）';
+      document.getElementById('photoCaption').value = '';
+
+      progressEl.style.display = 'block';
+      const lines = files.map(f=> `⏳ ${f.name}：等待中`);
+      const renderProgress = ()=> progressEl.innerHTML = lines.map(l=> escapeHtml(l)).join('<br>');
+      renderProgress();
+
+      for(let i = 0; i < files.length; i++){
+        const file = files[i];
+        let step = '轉檔';
+        try{
+          lines[i] = `🔄 ${file.name}：轉 WebP 縮圖中…`; renderProgress();
+          const thumb = await makeWebpThumb(file);
+          if(!thumb){
+            // 轉不出縮圖就整張不發布，確保照片牆上永遠只有 WebP、不會出現破圖
+            lines[i] = `❌ ${file.name}：無法解碼這個格式，未發布（請確認檔案沒壞，或回報我加上這個格式的支援）`;
+            renderProgress();
+            continue;
+          }
+
+          const ts = Date.now();
+          step = '上傳原始檔';
+          lines[i] = `🔄 ${file.name}：上傳原始檔中…`; renderProgress();
+          const origPath = `gallery/orig/${ts}_${file.name}`;
+          const origRef = ref(storage, origPath);
+          await uploadBytes(origRef, file, IMG_CACHE_META);
+          const origUrl = await getDownloadURL(origRef);
+
+          step = '上傳縮圖';
+          lines[i] = `🔄 ${file.name}：上傳縮圖中…`; renderProgress();
+          const thumbPath = `gallery/thumbs/${ts}_thumb.${thumb.ext}`;
+          const thumbRef = ref(storage, thumbPath);
+          await uploadBytes(thumbRef, thumb.blob, { ...IMG_CACHE_META, contentType: thumb.type });
+          const thumbUrl = await getDownloadURL(thumbRef);
+
+          step = '寫入資料庫';
+          lines[i] = `🔄 ${file.name}：寫入資料庫中…`; renderProgress();
+          await addDoc(colRef, {
+            imageUrl: thumbUrl,        // 照片牆/燈箱顯示用（WebP 縮圖）
+            storagePath: thumbPath,
+            originalUrl: origUrl,      // 燈箱「下載原圖」按鈕用（原始檔完整保留）
+            originalPath: origPath,
+            originalName: file.name,
+            caption,
+            uploadedAt: serverTimestamp()
+          });
+          lines[i] = `✅ ${file.name}：完成`; renderProgress();
+        }catch(err){
+          console.error(`上傳失敗（${file.name}，卡在「${step}」）`, err);
+          // 明確標出是哪一步、什麼錯誤，不再用籠統的「上傳失敗」彈窗誤導
+          lines[i] = `❌ ${file.name}：失敗於「${step}」（${err && err.code ? err.code : (err && err.message) || '未知錯誤'}）`;
+          renderProgress();
+        }
       }
-      spinner.style.display = 'none';
     };
   }
 
@@ -777,7 +900,7 @@
 
         const path = `fursonas/${Date.now()}_${selectedFursonaFile.name}`;
         const sRef = ref(storage, path);
-        await uploadBytes(sRef, selectedFursonaFile);
+        await uploadBytes(sRef, selectedFursonaFile, IMG_CACHE_META);
         const url = await getDownloadURL(sRef);
         await addDoc(colRef, {
           imageUrl: url,
@@ -832,7 +955,7 @@
       try{
         const path = `egg/avatar_${Date.now()}_${selectedEggAvatar.name}`;
         const sRef = ref(storage, path);
-        await uploadBytes(sRef, selectedEggAvatar);
+        await uploadBytes(sRef, selectedEggAvatar, IMG_CACHE_META);
         const url = await getDownloadURL(sRef);
         await setDoc(settingsRef, { stage1AvatarUrl: url, updatedAt: serverTimestamp() }, { merge:true });
         const snap = await getDoc(settingsRef);
@@ -859,7 +982,7 @@
       try{
         const path = `egg/sound_${Date.now()}_${selectedEggSound.name}`;
         const sRef = ref(storage, path);
-        await uploadBytes(sRef, selectedEggSound);
+        await uploadBytes(sRef, selectedEggSound, IMG_CACHE_META);
         const url = await getDownloadURL(sRef);
         await setDoc(settingsRef, { stage1SoundUrl: url, updatedAt: serverTimestamp() }, { merge:true });
         const snap = await getDoc(settingsRef);
@@ -919,6 +1042,61 @@
       const status = document.getElementById('photoStatus');
       status.classList.add('show');
       setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+  }
+
+  // ---------- 圖片快取修復（把舊檔案的 metadata 補上快取設定） ----------
+  function initFixCache(){
+    // 從下載網址反推 Storage 路徑（彩蛋檔案當初只存了網址、沒存路徑，用這個補救）
+    function pathFromDownloadUrl(url){
+      try{
+        const m = (url || '').match(/\/o\/([^?]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
+      }catch(err){ return ''; }
+    }
+
+    document.getElementById('fixCacheBtn').onclick = async ()=>{
+      const btn = document.getElementById('fixCacheBtn');
+      const status = document.getElementById('fixCacheStatus');
+      btn.disabled = true;
+      status.style.display = 'block';
+      status.textContent = '整理檔案清單中…';
+
+      // 收集所有已知檔案的 Storage 路徑
+      const paths = new Set();
+      for(const colName of ['avatars', 'gallery', 'fursonas']){
+        const snap = await getDocs(collection(db, colName));
+        snap.forEach(d=>{
+          const data = d.data();
+          const p = data.storagePath || pathFromDownloadUrl(data.imageUrl);
+          if(p) paths.add(p);
+        });
+      }
+      const eggSnap = await getDoc(doc(db, 'settings', 'easterEgg'));
+      if(eggSnap.exists()){
+        const d = eggSnap.data();
+        [d.stage1AvatarUrl, d.stage1SoundUrl].forEach(u=>{
+          const p = pathFromDownloadUrl(u);
+          if(p) paths.add(p);
+        });
+      }
+
+      let done = 0, failed = 0;
+      const all = [...paths];
+      for(const p of all){
+        try{
+          await updateMetadata(ref(storage, p), IMG_CACHE_META);
+          done++;
+        }catch(err){
+          failed++;
+          console.warn('快取修復失敗：', p, err);
+        }
+        status.textContent = `修復中… ${done + failed} / ${all.length}`;
+      }
+      status.textContent = failed
+        ? `完成：成功 ${done} 個，失敗 ${failed} 個（詳見瀏覽器 console）`
+        : `完成！已修復 ${done} 個檔案 ✓`;
+      btn.disabled = false;
     };
   }
 
