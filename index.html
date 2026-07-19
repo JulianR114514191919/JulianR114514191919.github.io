@@ -1083,7 +1083,7 @@
     try{ if(navigator.vibrate) navigator.vibrate(40); }catch(err){}
     clickCount = 0;
     if(window.eggConfig.avatar){
-      const eggSrc = window.cachedSrc ? window.cachedSrc(window.eggConfig.avatar) : window.eggConfig.avatar;
+      const eggSrc = window.eggConfig.avatar;
       avatarImg.src = eggSrc;
       window.setFavicon(eggSrc);
     }
@@ -1207,7 +1207,7 @@
     let html = `<div class="modal-title">設定圖</div>`;
     if(list){
       html += list.map((f, idx) => `
-        <img class="modal-img" data-idx="${idx}" style="cursor:pointer;" src="${window.cachedSrc ? window.cachedSrc(f.imageUrl) : f.imageUrl}" alt="" loading="lazy">
+        <img class="modal-img" data-idx="${idx}" style="cursor:pointer;" src="${f.imageUrl}" alt="" loading="lazy">
         <div style="font-size:12px; color:var(--muted); font-weight:600; margin:6px 0 16px;">${f.label ? f.label.replace(/</g,'&lt;') : ''}</div>
       `).join('');
     } else {
@@ -1453,7 +1453,7 @@
     }
     const html = photos.map(p => `
       <div class="pin">
-        <img src="${cachedSrc(p.imageUrl)}" alt="${escapeHtml(p.caption||'')}" decoding="async" loading="lazy">
+        <img src="${p.imageUrl}" alt="${escapeHtml(p.caption||'')}" decoding="async" loading="lazy">
         ${p.caption ? `<div class="cap">${escapeHtml(p.caption)}</div>` : ''}
       </div>
     `).join('');
@@ -1489,14 +1489,14 @@
       const p = list[idx];
       if(instant){
         // 第一次開啟：直接換成正確的圖，不要有延遲（不然會看到上一次殘留在元素裡的舊圖畫面）
-        imgEl.src = cachedSrc(p.imageUrl);
+        imgEl.src = p.imageUrl;
         imgEl.alt = p.caption || '';
         imgEl.style.opacity = '1';
       } else {
         // 左右切換照片時：才需要平滑的淡出→換圖→淡入過場
         imgEl.style.opacity = '0';
         setTimeout(()=>{
-          imgEl.src = cachedSrc(p.imageUrl);
+          imgEl.src = p.imageUrl;
           imgEl.alt = p.caption || '';
           imgEl.style.opacity = '1';
         }, 120);
@@ -1536,7 +1536,7 @@
     downloadBtn.addEventListener('click', ()=>{
       const p = currentList[idx];
       if(!p || !p.originalUrl) return;
-      // Firebase Storage 的下載網址自帶「附件下載」標頭，用隱形連結點一下就會觸發存檔
+      // 原始檔上傳時已由後台標記為「附件下載」，用隱形連結點一下就會直接存檔
       const a = document.createElement('a');
       a.href = p.originalUrl;
       a.download = p.originalName || '';
@@ -1689,7 +1689,7 @@
       // 如果這段等待期間又觸發了更新的請求（連點太快）或彩蛋已經啟動，這次的結果就作廢
       if(myToken !== avatarSwapToken) return;
       if(window.eggStage && window.eggStage !== 0) return;
-      const src = cachedSrc(a.imageUrl);
+      const src = a.imageUrl;
       // 先在背景把圖抓好、解碼完才換上去——已有快取時瞬間完成；
       // 就算真的還要下載，也是「維持舊圖淡出狀態多等一下」，不會先換上一張空白圖
       try{ const pre = new Image(); pre.src = src; await pre.decode(); }catch(err){}
@@ -1747,8 +1747,6 @@
   if(document.readyState === 'complete') setTimeout(startPreload, 800);
   else window.addEventListener('load', ()=> setTimeout(startPreload, 800));
 
-  function cachedSrc(url){ return url || ''; } // 直接回原網址，靠瀏覽器 HTTP 快取（後台已設定一年）
-  window.cachedSrc = cachedSrc;
 
   try{
     const avatarQ = query(collection(db, 'avatars'), orderBy('order', 'asc'));
@@ -1901,7 +1899,7 @@
         const tileRefImg = document.getElementById('tileRefImg');
         if(tileRef && tileRefImg){
           tileRefImg.onload = ()=> tileRefImg.classList.add('loaded');
-          tileRefImg.src = cachedSrc(list[0].imageUrl);
+          tileRefImg.src = list[0].imageUrl;
           tileRef.classList.add('has-img');
         }
       }
