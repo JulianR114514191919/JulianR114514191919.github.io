@@ -344,6 +344,11 @@
     background: rgba(255,255,255,0.12); border:none; color:#F3EAD9; font-size:16px; cursor:pointer;
     display:flex; align-items:center; justify-content:center; z-index:2;
   }
+  .lightbox-download{
+    position:absolute; top:calc(14px + env(safe-area-inset-top)); left:16px; width:36px; height:36px; border-radius:50%;
+    background: rgba(255,255,255,0.12); border:none; color:#F3EAD9; font-size:16px; cursor:pointer;
+    display:none; align-items:center; justify-content:center; z-index:2;
+  }
   .lightbox-nav{
     position:absolute; top:50%; transform:translateY(-50%);
     width:42px; height:42px; border-radius:50%;
@@ -701,6 +706,7 @@
   <!-- 照片牆燈箱 -->
   <div class="lightbox-overlay" id="lightboxOverlay">
     <button class="lightbox-close" id="lightboxClose">✕</button>
+    <button class="lightbox-download" id="lightboxDownload" title="下載原圖">⬇</button>
     <div class="lightbox-counter" id="lightboxCounter"></div>
     <div class="lightbox-stage" id="lightboxStage">
       <img class="lightbox-img" id="lightboxImg" src="" alt="">
@@ -1469,6 +1475,7 @@
     const capEl = document.getElementById('lightboxCaption');
     const counterEl = document.getElementById('lightboxCounter');
     const closeBtn = document.getElementById('lightboxClose');
+    const downloadBtn = document.getElementById('lightboxDownload');
     const prevBtn = document.getElementById('lightboxPrev');
     const nextBtn = document.getElementById('lightboxNext');
 
@@ -1496,6 +1503,8 @@
       }
       capEl.textContent = p.caption || '';
       counterEl.textContent = list.length > 1 ? `${idx + 1} / ${list.length}` : '';
+      // 有保留原始檔的照片才顯示下載鈕（設定圖、舊照片沒有原始檔就藏起來）
+      downloadBtn.style.display = p.originalUrl ? 'flex' : 'none';
       prevBtn.disabled = idx === 0;
       nextBtn.disabled = idx === list.length - 1;
       prevBtn.style.display = list.length > 1 ? 'flex' : 'none';
@@ -1524,6 +1533,18 @@
     function goNext(){ if(idx < currentList.length - 1){ idx++; render(); } }
 
     closeBtn.addEventListener('click', close);
+    downloadBtn.addEventListener('click', ()=>{
+      const p = currentList[idx];
+      if(!p || !p.originalUrl) return;
+      // Firebase Storage 的下載網址自帶「附件下載」標頭，用隱形連結點一下就會觸發存檔
+      const a = document.createElement('a');
+      a.href = p.originalUrl;
+      a.download = p.originalName || '';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
     prevBtn.addEventListener('click', goPrev);
     nextBtn.addEventListener('click', goNext);
     overlay.addEventListener('click', e=>{ if(e.target === overlay) close(); });
@@ -1664,18 +1685,24 @@
     }
     const a = window.avatarLib[window.avatarIndex % window.avatarLib.length];
     avatarImgEl.style.opacity = '0';
-    setTimeout(()=>{
+    setTimeout(async ()=>{
       // 如果這段等待期間又觸發了更新的請求（連點太快）或彩蛋已經啟動，這次的結果就作廢
       if(myToken !== avatarSwapToken) return;
       if(window.eggStage && window.eggStage !== 0) return;
-      avatarImgEl.src = cachedSrc(a.imageUrl);
+      const src = cachedSrc(a.imageUrl);
+      // 先在背景把圖抓好、解碼完才換上去——已有快取時瞬間完成；
+      // 就算真的還要下載，也是「維持舊圖淡出狀態多等一下」，不會先換上一張空白圖
+      try{ const pre = new Image(); pre.src = src; await pre.decode(); }catch(err){}
+      if(myToken !== avatarSwapToken) return;
+      if(window.eggStage && window.eggStage !== 0) return;
+      avatarImgEl.src = src;
       pfpCreditEl.textContent = a.artist ? `PFP by ${a.artist}` : '';
       avatarImgEl.style.opacity = '1';
       const cloneImg = document.getElementById('avatarImgClone');
       const clonePfp = document.getElementById('pfpCreditClone');
-      if(cloneImg) cloneImg.src = cachedSrc(a.imageUrl);
+      if(cloneImg) cloneImg.src = src;
       if(clonePfp) clonePfp.textContent = a.artist ? `PFP by ${a.artist}` : '';
-      if(typeof window.setFavicon === 'function') window.setFavicon(cachedSrc(a.imageUrl));
+      if(typeof window.setFavicon === 'function') window.setFavicon(src);
     }, 70);
   }
 
