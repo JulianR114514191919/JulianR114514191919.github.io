@@ -138,6 +138,9 @@
     45%{ opacity:.88; transform:scale(.992); }
     100%{ opacity:1; transform:scale(1); }
   }
+  /* 進場動畫播完後由 JS 加上 .risen/.entered 凍結成靜態，移除殘留特效層（Android 閃爍緩解）；
+     規則放在 .frosting 之前，霧化動畫之後仍可正常覆蓋播放 */
+  .glass.risen{ animation: none; }
   .glass.frosting{ animation: cardfrost .32s ease; will-change: opacity, transform; }
 
   #p1 .glass, #p1clone .glass{ text-align:center; }
@@ -159,6 +162,7 @@
     opacity:0; transform: scale(1.3); filter: blur(8px);
     animation: fadeZoom 1s var(--ease) forwards;
   }
+  .name.entered{ animation: none; opacity:1; transform:none; filter:none; }
   @keyframes fadeZoom{ to{ opacity:1; transform: scale(1); filter: blur(0); } }
 
   .sub{ font-size:13.5px; color:var(--muted); margin-bottom:24px; font-weight:500; letter-spacing:.01em; }
@@ -345,10 +349,24 @@
     display:flex; align-items:center; justify-content:center; z-index:2;
   }
   .lightbox-download{
-    position:absolute; top:calc(14px + env(safe-area-inset-top)); left:16px; width:36px; height:36px; border-radius:50%;
-    background: rgba(255,255,255,0.12); border:none; color:#F3EAD9; font-size:16px; cursor:pointer;
-    display:none; align-items:center; justify-content:center; z-index:2;
+    position:absolute; top:calc(14px + env(safe-area-inset-top)); left:16px; height:36px; border-radius:18px;
+    background: linear-gradient(135deg, var(--rust), var(--moss)); border:none; color:#fff;
+    font-size:14px; font-weight:700; letter-spacing:.02em; cursor:pointer;
+    display:none; align-items:center; justify-content:center; gap:7px; z-index:2;
+    padding:0 14px; max-width:200px; overflow:hidden; white-space:nowrap;
+    transition: max-width .35s var(--ease), padding .35s var(--ease);
   }
+  .lightbox-download .dl-ic{ font-size:16px; flex-shrink:0; }
+  .lightbox-download .dl-label{ font-size:12.5px; }
+  /* 首次開啟的引導：紅色緩慢呼吸，直到使用者下載過一次為止 */
+  .lightbox-download.attract{ animation: dlBreath 2.4s ease-in-out infinite; }
+  @keyframes dlBreath{
+    0%, 100%{ box-shadow: 0 0 0 0 rgba(229, 57, 53, 0); }
+    50%{ box-shadow: 0 0 0 7px rgba(229, 57, 53, .28), 0 0 18px rgba(229, 57, 53, .55); }
+  }
+  /* 下載過之後：收成純圖示的小圓鈕，不再吸引注意 */
+  .lightbox-download.compact{ max-width:36px; width:36px; padding:0; animation:none; }
+  .lightbox-download.compact .dl-label{ display:none; }
   .lightbox-nav{
     position:absolute; top:50%; transform:translateY(-50%);
     width:42px; height:42px; border-radius:50%;
@@ -706,7 +724,7 @@
   <!-- 照片牆燈箱 -->
   <div class="lightbox-overlay" id="lightboxOverlay">
     <button class="lightbox-close" id="lightboxClose">✕</button>
-    <button class="lightbox-download" id="lightboxDownload" title="下載原圖">⬇</button>
+    <button class="lightbox-download" id="lightboxDownload" title="下載原始檔"><span class="dl-ic">⬇</span><span class="dl-label">完整圖片下載</span></button>
     <div class="lightbox-counter" id="lightboxCounter"></div>
     <div class="lightbox-stage" id="lightboxStage">
       <img class="lightbox-img" id="lightboxImg" src="" alt="">
@@ -769,9 +787,7 @@
   }
 
   function replayEntrance(i){
-    // 只保留跟彩蛋狀態有關的資料重置，動畫本身不再手動觸發——
-    // 所有頁面在網頁一載入時就已經在背景淡入完成了，滑過去看到時早就是穩定狀態，
-    // 不需要（也不應該）再強迫重播一次，那樣反而會讓內容「先消失一瞬間」再淡入。
+    // 進場動畫載入時已播完，這裡只需重置第一頁的彩蛋狀態
     if(i === 0 && typeof resetEgg === 'function') resetEgg();
   }
 
@@ -813,10 +829,13 @@
       track.style.transition = 'none';
       current = 0;
       applyTransform();
-      void track.offsetWidth;
-      track.style.transition = '';
-      replayEntrance(0);
-      looping = false;
+      // 用兩層 rAF 等瞬間跳轉真正上屏後才恢復過場，避免 Android Chrome 在同一幀內
+      // 「跳轉＋恢復 transition」造成的整頁閃爍
+      requestAnimationFrame(()=> requestAnimationFrame(()=>{
+        track.style.transition = '';
+        replayEntrance(0);
+        looping = false;
+      }));
     };
     track.addEventListener('transitionend', onEnd);
   }
@@ -829,18 +848,19 @@
     track.style.transition = '';
     track.style.transform = `translateX(0%)`; // 滑到最前端複製的 p4
     setDot(total-1);
-    const onEnd = (ev)=>{
+    const onEnd2 = (ev)=>{
       if(ev.propertyName !== 'transform') return;
-      track.removeEventListener('transitionend', onEnd);
+      track.removeEventListener('transitionend', onEnd2);
       track.style.transition = 'none';
       current = total-1;
       applyTransform();
-      void track.offsetWidth;
-      track.style.transition = '';
-      replayEntrance(total-1);
-      looping = false;
+      requestAnimationFrame(()=> requestAnimationFrame(()=>{
+        track.style.transition = '';
+        replayEntrance(total-1);
+        looping = false;
+      }));
     };
-    track.addEventListener('transitionend', onEnd);
+    track.addEventListener('transitionend', onEnd2);
   }
 
   dots.forEach(d => d.addEventListener('click', ()=>{
@@ -1004,16 +1024,61 @@
   });
 
   // 滑鼠滾輪翻頁（電腦版）；行事曆改由方向鍵控制，不再用滾輪觸發
+  // 若游標所在的卡片內容還能繼續捲動（例如照片牆），先讓它捲，捲到底/頂才翻頁
+  function innerCanScroll(target, deltaY){
+    let el = target instanceof Element ? target : null;
+    while(el && el !== app){
+      if(el.scrollHeight > el.clientHeight + 1){
+        const oy = getComputedStyle(el).overflowY;
+        if(oy === 'auto' || oy === 'scroll'){
+          if(deltaY > 0 && el.scrollTop + el.clientHeight < el.scrollHeight - 1) return true;
+          if(deltaY < 0 && el.scrollTop > 0) return true;
+        }
+      }
+      el = el.parentElement;
+    }
+    return false;
+  }
   let wheelLock = false;
   app.addEventListener('wheel', e=>{
     if(wheelLock || looping || calOpen) return;
-    const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    const vertical = Math.abs(e.deltaY) > Math.abs(e.deltaX);
+    if(vertical && innerCanScroll(e.target, e.deltaY)) return; // 交還給內部捲動
+    const delta = vertical ? e.deltaY : e.deltaX;
     if(Math.abs(delta) < 12) return;
     wheelLock = true;
     if(typeof cancelHintTimer === 'function') cancelHintTimer();
     if(delta > 0) goTo(current+1); else goTo(current-1);
     setTimeout(()=>{ wheelLock = false; }, 650);
   }, {passive:true});
+
+  // ---------- 進場動畫收尾凍結 + 點名字重播 ----------
+  // Android Chrome 在循環瞬間跳轉時會重繪殘留的 filter/animation 圖層造成閃爍；
+  // 動畫播完就把元素凍結成靜態樣式，特效層消失，跳轉時就沒東西可閃
+  function freezeAfterEntrance(el){
+    const isName = el.classList.contains('name');
+    const animName = isName ? 'fadeZoom' : 'rise';
+    const onAnimEnd = (ev)=>{
+      if(ev.target !== el || ev.animationName !== animName) return;
+      el.removeEventListener('animationend', onAnimEnd);
+      el.classList.add(isName ? 'entered' : 'risen'); // 用 class 凍結，不會蓋掉之後的霧化動畫
+    };
+    el.addEventListener('animationend', onAnimEnd);
+  }
+  document.querySelectorAll('.glass, .name').forEach(freezeAfterEntrance);
+
+  // 點主頁名字：重播一次進場動畫（先清掉凍結狀態再重啟）
+  const nameMain = document.querySelector('#p1 .name');
+  if(nameMain){
+    nameMain.style.cursor = 'pointer';
+    nameMain.addEventListener('click', ()=>{
+      nameMain.classList.remove('entered');
+      nameMain.style.animation = 'none';
+      void nameMain.offsetWidth;
+      nameMain.style.animation = '';
+      freezeAfterEntrance(nameMain);
+    });
+  }
 
   // ---------- 頭貼彩蛋 + 頭貼庫切換 ----------
   const avatarWrap = document.getElementById('avatarWrap');
@@ -1054,7 +1119,7 @@
     styleTag.textContent = `
       a, button, .about-tile, .pin, .dot, .cal-cell, .cal-nav-btn,
       .lightbox-nav, .lightbox-close, .modal-close, .cal-handle,
-      .albumbtn, .np-listen-btn, .avatar, .links a {
+      .albumbtn, .np-listen-btn, .avatar, .name, .links a {
         cursor: ${pointerUri} !important;
       }
     `;
@@ -1090,6 +1155,9 @@
     avatarImg.style.opacity = '1';
     const pfpEl = document.getElementById('pfpCredit');
     if(pfpEl) pfpEl.textContent = '';
+    // 彩蛋已被找到，底下的引導文字功成身退，淡出隱藏
+    const hintEl = document.querySelector('#p1 .hint');
+    if(hintEl){ hintEl.style.transition = 'opacity .35s ease'; hintEl.style.opacity = '0'; }
     subText.textContent = EGG_SUB;
     if(window.eggConfig.sound){
       try{ eggAudio.currentTime = 0; eggAudio.play(); }catch(err){}
@@ -1111,6 +1179,8 @@
     if(wasActive){
       if(typeof window.restoreCurrentAvatar === 'function') window.restoreCurrentAvatar();
       subText.textContent = window.currentSubtitle || '';
+      const hintEl = document.querySelector('#p1 .hint');
+      if(hintEl) hintEl.style.opacity = '';
     }
   }
   function currentPressDuration(){
@@ -1504,7 +1574,15 @@
       capEl.textContent = p.caption || '';
       counterEl.textContent = list.length > 1 ? `${idx + 1} / ${list.length}` : '';
       // 有保留原始檔的照片才顯示下載鈕（設定圖、舊照片沒有原始檔就藏起來）
-      downloadBtn.style.display = p.originalUrl ? 'flex' : 'none';
+      if(p.originalUrl){
+        downloadBtn.style.display = 'flex';
+        // 沒下載過：完整文字＋紅色呼吸引導；下載過（記在本機）：純圓形圖示，不再打擾
+        const hasDownloaded = localStorage.getItem('lbHasDownloaded') === '1';
+        downloadBtn.classList.toggle('compact', hasDownloaded);
+        downloadBtn.classList.toggle('attract', !hasDownloaded);
+      }else{
+        downloadBtn.style.display = 'none';
+      }
       prevBtn.disabled = idx === 0;
       nextBtn.disabled = idx === list.length - 1;
       prevBtn.style.display = list.length > 1 ? 'flex' : 'none';
@@ -1544,6 +1622,12 @@
       document.body.appendChild(a);
       a.click();
       a.remove();
+      // 第一次下載後：引導任務完成，縮成小圓鈕並記住，之後不再出現文字與呼吸提示
+      if(!downloadBtn.classList.contains('compact')){
+        downloadBtn.classList.remove('attract');
+        downloadBtn.classList.add('compact');
+        try{ localStorage.setItem('lbHasDownloaded', '1'); }catch(err){}
+      }
     });
     prevBtn.addEventListener('click', goPrev);
     nextBtn.addEventListener('click', goNext);
@@ -1716,10 +1800,8 @@
     applyAvatar();
   };
 
-  /* ---- 圖片預載：開站後在背景一張一張讓瀏覽器抓進 HTTP 快取 ----
-     檔案的快取設定已由後台「快取修復」補上（一年），所以只需輕量預載即可；
-     之前用 fetch 抓 blob 的做法會被 CORS 擋下但頻寬照樣消耗，等於每張圖下載兩次、
-     把頻寬塞爆拖慢整站，已改掉 */
+  /* ---- 圖片預載：頁面載完後在背景逐張抓進 HTTP 快取（後台已設一年快取）；
+     注意：不可改用 fetch 抓 blob——會被 CORS 擋下但頻寬照樣消耗，等於每張圖下載兩次 */
   const _preloadSeen = new Set();
   const _preloadQueue = [];
   let _preloadStarted = false;
