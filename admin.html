@@ -277,7 +277,7 @@
       <div class="card">
         <h2>新增頭貼</h2>
         <label class="upload-zone" id="avatarUploadZone">
-          🖼️ 點擊選擇頭貼圖片
+          <span id="avatarZoneText">🖼️ 點擊選擇頭貼圖片</span>
           <input type="file" id="avatarInput" accept="image/*">
         </label>
         <label>繪師（選填）</label>
@@ -315,7 +315,7 @@
       <div class="card">
         <h2>上傳照片</h2>
         <label class="upload-zone" id="uploadZone">
-          📷 點擊選擇照片（可一次選多張）
+          <span id="uploadZoneText">📷 點擊選擇照片（可一次選多張）</span>
           <input type="file" id="photoInput" accept="image/*,.jxl,.tif,.tiff" multiple>
         </label>
         <label>圖說（選填，套用到這批全部照片）</label>
@@ -335,7 +335,7 @@
         <h2>Fursona 設定圖</h2>
         <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">新上傳的會排在原本紫色設定圖下方，「關於我」的設定圖方塊點開後會依序全部顯示。</p>
         <label class="upload-zone" id="fursonaUploadZone">
-          🎨 點擊選擇設定圖
+          <span id="fursonaZoneText">🎨 點擊選擇設定圖</span>
           <input type="file" id="fursonaInput" accept="image/*">
         </label>
         <label>標籤（選填，例如「第二設定」）</label>
@@ -353,7 +353,7 @@
         <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">長按或連點頭貼 11 下觸發時，換上的頭貼圖片。</p>
         <div id="eggAvatarPreview" style="margin-bottom:12px;"></div>
         <label class="upload-zone" id="eggAvatarUploadZone">
-          🖼️ 選擇新的彩蛋頭貼
+          <span id="eggAvatarZoneText">🖼️ 選擇新的彩蛋頭貼</span>
           <input type="file" id="eggAvatarInput" accept="image/*">
         </label>
         <button class="btn btn-primary btn-block" id="eggAvatarSaveBtn">更新彩蛋頭貼</button>
@@ -365,7 +365,7 @@
         <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">觸發彩蛋時播放的音效檔。</p>
         <div id="eggSoundPreview" style="margin-bottom:12px;"></div>
         <label class="upload-zone" id="eggSoundUploadZone">
-          🔊 選擇新的音效檔
+          <span id="eggSoundZoneText">🔊 選擇新的音效檔</span>
           <input type="file" id="eggSoundInput" accept="audio/*">
         </label>
         <button class="btn btn-primary btn-block" id="eggSoundSaveBtn">更新彩蛋音效</button>
@@ -648,7 +648,7 @@
     let selectedAvatarFile = null;
     document.getElementById('avatarInput').addEventListener('change', (e)=>{
       selectedAvatarFile = e.target.files[0] || null;
-      document.getElementById('avatarUploadZone').textContent = selectedAvatarFile ? `已選擇：${selectedAvatarFile.name}` : '🖼️ 點擊選擇頭貼圖片';
+      document.getElementById('avatarZoneText').textContent = selectedAvatarFile ? `已選擇：${selectedAvatarFile.name}` : '🖼️ 點擊選擇頭貼圖片';
     });
 
     document.getElementById('avatarUploadBtn').onclick = async ()=>{
@@ -673,7 +673,7 @@
         });
         document.getElementById('avatarArtist').value = '';
         document.getElementById('avatarInput').value = '';
-        document.getElementById('avatarUploadZone').textContent = '🖼️ 點擊選擇頭貼圖片';
+        document.getElementById('avatarZoneText').textContent = '🖼️ 點擊選擇頭貼圖片';
         selectedAvatarFile = null;
       }catch(err){
         console.error(err);
@@ -777,12 +777,12 @@
 
     let selectedFiles = [];
     const photoInput = document.getElementById('photoInput');
-    const uploadZone = document.getElementById('uploadZone');
+    const uploadZoneText = document.getElementById('uploadZoneText');
     const progressEl = document.getElementById('uploadProgress');
 
     photoInput.addEventListener('change', (e)=>{
       selectedFiles = [...(e.target.files || [])];
-      uploadZone.textContent = selectedFiles.length
+      uploadZoneText.textContent = selectedFiles.length
         ? `已選擇 ${selectedFiles.length} 張：${selectedFiles.map(f=>f.name).join('、')}`
         : '📷 點擊選擇照片（可一次選多張）';
     });
@@ -794,7 +794,7 @@
       // 立刻釋放選擇器：這批在背景跑的同時，馬上就能再選下一批
       selectedFiles = [];
       photoInput.value = '';
-      uploadZone.textContent = '📷 點擊選擇照片（可一次選多張）';
+      uploadZoneText.textContent = '📷 點擊選擇照片（可一次選多張）';
       document.getElementById('photoCaption').value = '';
 
       progressEl.style.display = 'block';
@@ -820,7 +820,11 @@
           lines[i] = `🔄 ${file.name}：上傳原始檔中…`; renderProgress();
           const origPath = `gallery/orig/${ts}_${file.name}`;
           const origRef = ref(storage, origPath);
-          await uploadBytes(origRef, file, IMG_CACHE_META);
+          await uploadBytes(origRef, file, {
+            ...IMG_CACHE_META,
+            // 強制當附件下載：前台按下載鈕會直接存檔，不會開新視窗顯示圖片
+            contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`
+          });
           const origUrl = await getDownloadURL(origRef);
 
           step = '上傳縮圖';
@@ -886,7 +890,7 @@
     let selectedFursonaFile = null;
     document.getElementById('fursonaInput').addEventListener('change', (e)=>{
       selectedFursonaFile = e.target.files[0] || null;
-      document.getElementById('fursonaUploadZone').textContent = selectedFursonaFile ? `已選擇：${selectedFursonaFile.name}` : '🎨 點擊選擇設定圖';
+      document.getElementById('fursonaZoneText').textContent = selectedFursonaFile ? `已選擇：${selectedFursonaFile.name}` : '🎨 點擊選擇設定圖';
     });
 
     document.getElementById('fursonaUploadBtn').onclick = async ()=>{
@@ -911,7 +915,7 @@
         });
         document.getElementById('fursonaLabel').value = '';
         document.getElementById('fursonaInput').value = '';
-        document.getElementById('fursonaUploadZone').textContent = '🎨 點擊選擇設定圖';
+        document.getElementById('fursonaZoneText').textContent = '🎨 點擊選擇設定圖';
         selectedFursonaFile = null;
       }catch(err){
         console.error(err);
@@ -946,7 +950,7 @@
     let selectedEggAvatar = null;
     document.getElementById('eggAvatarInput').addEventListener('change', (e)=>{
       selectedEggAvatar = e.target.files[0] || null;
-      document.getElementById('eggAvatarUploadZone').textContent = selectedEggAvatar ? `已選擇：${selectedEggAvatar.name}` : '🖼️ 選擇新的彩蛋頭貼';
+      document.getElementById('eggAvatarZoneText').textContent = selectedEggAvatar ? `已選擇：${selectedEggAvatar.name}` : '🖼️ 選擇新的彩蛋頭貼';
     });
     document.getElementById('eggAvatarSaveBtn').onclick = async ()=>{
       if(!selectedEggAvatar) return;
@@ -961,7 +965,7 @@
         const snap = await getDoc(settingsRef);
         renderEggPreview(snap.data());
         document.getElementById('eggAvatarInput').value = '';
-        document.getElementById('eggAvatarUploadZone').textContent = '🖼️ 選擇新的彩蛋頭貼';
+        document.getElementById('eggAvatarZoneText').textContent = '🖼️ 選擇新的彩蛋頭貼';
         selectedEggAvatar = null;
       }catch(err){
         console.error(err);
@@ -973,7 +977,7 @@
     let selectedEggSound = null;
     document.getElementById('eggSoundInput').addEventListener('change', (e)=>{
       selectedEggSound = e.target.files[0] || null;
-      document.getElementById('eggSoundUploadZone').textContent = selectedEggSound ? `已選擇：${selectedEggSound.name}` : '🔊 選擇新的音效檔';
+      document.getElementById('eggSoundZoneText').textContent = selectedEggSound ? `已選擇：${selectedEggSound.name}` : '🔊 選擇新的音效檔';
     });
     document.getElementById('eggSoundSaveBtn').onclick = async ()=>{
       if(!selectedEggSound) return;
@@ -988,7 +992,7 @@
         const snap = await getDoc(settingsRef);
         renderEggPreview(snap.data());
         document.getElementById('eggSoundInput').value = '';
-        document.getElementById('eggSoundUploadZone').textContent = '🔊 選擇新的音效檔';
+        document.getElementById('eggSoundZoneText').textContent = '🔊 選擇新的音效檔';
         selectedEggSound = null;
       }catch(err){
         console.error(err);
@@ -1062,14 +1066,17 @@
       status.style.display = 'block';
       status.textContent = '整理檔案清單中…';
 
-      // 收集所有已知檔案的 Storage 路徑
+      // 收集所有已知檔案的 Storage 路徑（原始檔另外標記，要多補「強制下載」設定）
       const paths = new Set();
+      const origPaths = new Set();
       for(const colName of ['avatars', 'gallery', 'fursonas']){
         const snap = await getDocs(collection(db, colName));
         snap.forEach(d=>{
           const data = d.data();
           const p = data.storagePath || pathFromDownloadUrl(data.imageUrl);
           if(p) paths.add(p);
+          const op = data.originalPath || '';
+          if(op) origPaths.add(op);
         });
       }
       const eggSnap = await getDoc(doc(db, 'settings', 'easterEgg'));
@@ -1082,16 +1089,22 @@
       }
 
       let done = 0, failed = 0;
-      const all = [...paths];
-      for(const p of all){
+      const jobs = [
+        ...[...paths].map(p=> ({ p, meta: IMG_CACHE_META })),
+        ...[...origPaths].map(p=> ({ p, meta: {
+          ...IMG_CACHE_META,
+          contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(p.split('/').pop().replace(/^\d+_/, ''))}`
+        }}))
+      ];
+      for(const job of jobs){
         try{
-          await updateMetadata(ref(storage, p), IMG_CACHE_META);
+          await updateMetadata(ref(storage, job.p), job.meta);
           done++;
         }catch(err){
           failed++;
-          console.warn('快取修復失敗：', p, err);
+          console.warn('快取修復失敗：', job.p, err);
         }
-        status.textContent = `修復中… ${done + failed} / ${all.length}`;
+        status.textContent = `修復中… ${done + failed} / ${jobs.length}`;
       }
       status.textContent = failed
         ? `完成：成功 ${done} 個，失敗 ${failed} 個（詳見瀏覽器 console）`
