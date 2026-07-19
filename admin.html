@@ -600,6 +600,73 @@
     };
   }
 
+  // 把任何圖檔解碼後轉成 WebP 縮圖（最長邊 maxSize px）。共用於照片牆(1600)與頭貼/彩蛋(512)。
+  // 解碼順序：瀏覽器原生（JPEG/PNG/WebP/AVIF…）→ TIFF 解碼器 → JPEG XL 解碼器。
+  // 全部失敗會回傳 null，該張照片不會發布——保證照片牆上永遠只有 WebP。
+  async function decodeToCanvas(file, maxSize){
+    const MAX = maxSize;
+    const drawScaled = (srcW, srcH, drawFn)=>{
+      const scale = Math.min(1, MAX / Math.max(srcW, srcH));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(srcW * scale);
+      canvas.height = Math.round(srcH * scale);
+      drawFn(canvas.getContext('2d'), canvas.width, canvas.height);
+      return canvas;
+    };
+
+    // 1) 瀏覽器原生解碼
+    try{
+      const bmp = await createImageBitmap(file);
+      const c = drawScaled(bmp.width, bmp.height, (ctx, w, h)=> ctx.drawImage(bmp, 0, 0, w, h));
+      bmp.close();
+      return c;
+    }catch(err){}
+
+    const name = (file.name || '').toLowerCase();
+    // ImageData 是全尺寸的，先畫到全尺寸 canvas 再縮
+    const fromImageData = (imageData)=>{
+      const full = document.createElement('canvas');
+      full.width = imageData.width; full.height = imageData.height;
+      full.getContext('2d').putImageData(imageData, 0, 0);
+      return drawScaled(full.width, full.height, (ctx, w, h)=> ctx.drawImage(full, 0, 0, w, h));
+    };
+
+    // 2) TIFF（瀏覽器不認得，用 UTIF 解碼器現場載入）
+    if(file.type === 'image/tiff' || /\.tiff?$/.test(name)){
+      try{
+        const mod = await import('https://cdn.jsdelivr.net/npm/utif2@4.1.0/+esm');
+        const UTIF = mod.default || mod;
+        const buf = await file.arrayBuffer();
+        const ifds = UTIF.decode(buf);
+        UTIF.decodeImage(buf, ifds[0]);
+        const rgba = UTIF.toRGBA8(ifds[0]);
+        return fromImageData(new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height));
+      }catch(err){ console.warn('TIFF 解碼失敗', err); }
+    }
+
+    // 3) JPEG XL（用 WASM 解碼器現場載入）
+    if(file.type === 'image/jxl' || /\.jxl$/.test(name)){
+      try{
+        const { decode } = await import('https://cdn.jsdelivr.net/npm/@jsquash/jxl@1/+esm');
+        const imageData = await decode(await file.arrayBuffer());
+        return fromImageData(imageData);
+      }catch(err){ console.warn('JPEG XL 解碼失敗', err); }
+    }
+
+    return null;
+  }
+
+  async function makeWebpThumb(file, maxSize){
+    const canvas = await decodeToCanvas(file, maxSize);
+    if(!canvas) return null;
+    const blob = await new Promise(res=> canvas.toBlob(res, 'image/webp', 0.82));
+    // 少數瀏覽器（如 Safari）不支援輸出 WebP，會拿到 null 或別的格式，就退回 JPEG
+    if(blob && blob.type === 'image/webp') return { blob, ext: 'webp', type: 'image/webp' };
+    const jpg = await new Promise(res=> canvas.toBlob(res, 'image/jpeg', 0.85));
+    return jpg ? { blob: jpg, ext: 'jpg', type: 'image/jpeg' } : null;
+  }
+
+
   // ---------- 頭貼庫 ----------
   function initAvatars(){
     const colRef = collection(db, 'avatars');
@@ -660,9 +727,16 @@
         let maxOrder = 0;
         snap.forEach(d=>{ const o = d.data().order || 0; if(o > maxOrder) maxOrder = o; });
 
-        const path = `avatars/${Date.now()}_${selectedAvatarFile.name}`;
+        // 頭貼只顯示在 92px 的小圓圈，轉成 512px WebP 就綽綽有餘（含高解析螢幕），
+        // 檔案從幾 MB 縮到幾十 KB，前台循環切換的解碼時間趨近於零
+        const thumb = await makeWebpThumb(selectedAvatarFile, 512);
+        const upBlob = thumb ? thumb.blob : selectedAvatarFile; // 罕見格式轉不動就退回原檔
+        const upExt  = thumb ? thumb.ext  : (selectedAvatarFile.name.split('.').pop() || 'img');
+        const upMeta = thumb ? { ...IMG_CACHE_META, contentType: thumb.type } : IMG_CACHE_META;
+
+        const path = `avatars/${Date.now()}_avatar.${upExt}`;
         const sRef = ref(storage, path);
-        await uploadBytes(sRef, selectedAvatarFile, IMG_CACHE_META);
+        await uploadBytes(sRef, upBlob, upMeta);
         const url = await getDownloadURL(sRef);
         await addDoc(colRef, {
           imageUrl: url,
@@ -677,7 +751,7 @@
         selectedAvatarFile = null;
       }catch(err){
         console.error(err);
-        alert('上傳失敗，請再試一次');
+        alert('上傳失敗：' + (err && err.code ? err.code : (err && err.message) || '未知錯誤'));
       }
       spinner.style.display = 'none';
     };
@@ -709,72 +783,6 @@
       });
     });
 
-    // 把任何圖檔解碼後轉成 WebP 縮圖（最長邊 1600px）。
-    // 解碼順序：瀏覽器原生（JPEG/PNG/WebP/AVIF…）→ TIFF 解碼器 → JPEG XL 解碼器。
-    // 全部失敗會回傳 null，該張照片不會發布——保證照片牆上永遠只有 WebP。
-    async function decodeToCanvas(file){
-      const MAX = 1600;
-      const drawScaled = (srcW, srcH, drawFn)=>{
-        const scale = Math.min(1, MAX / Math.max(srcW, srcH));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(srcW * scale);
-        canvas.height = Math.round(srcH * scale);
-        drawFn(canvas.getContext('2d'), canvas.width, canvas.height);
-        return canvas;
-      };
-
-      // 1) 瀏覽器原生解碼
-      try{
-        const bmp = await createImageBitmap(file);
-        const c = drawScaled(bmp.width, bmp.height, (ctx, w, h)=> ctx.drawImage(bmp, 0, 0, w, h));
-        bmp.close();
-        return c;
-      }catch(err){}
-
-      const name = (file.name || '').toLowerCase();
-      // ImageData 是全尺寸的，先畫到全尺寸 canvas 再縮
-      const fromImageData = (imageData)=>{
-        const full = document.createElement('canvas');
-        full.width = imageData.width; full.height = imageData.height;
-        full.getContext('2d').putImageData(imageData, 0, 0);
-        return drawScaled(full.width, full.height, (ctx, w, h)=> ctx.drawImage(full, 0, 0, w, h));
-      };
-
-      // 2) TIFF（瀏覽器不認得，用 UTIF 解碼器現場載入）
-      if(file.type === 'image/tiff' || /\.tiff?$/.test(name)){
-        try{
-          const mod = await import('https://cdn.jsdelivr.net/npm/utif2@4.1.0/+esm');
-          const UTIF = mod.default || mod;
-          const buf = await file.arrayBuffer();
-          const ifds = UTIF.decode(buf);
-          UTIF.decodeImage(buf, ifds[0]);
-          const rgba = UTIF.toRGBA8(ifds[0]);
-          return fromImageData(new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height));
-        }catch(err){ console.warn('TIFF 解碼失敗', err); }
-      }
-
-      // 3) JPEG XL（用 WASM 解碼器現場載入）
-      if(file.type === 'image/jxl' || /\.jxl$/.test(name)){
-        try{
-          const { decode } = await import('https://cdn.jsdelivr.net/npm/@jsquash/jxl@1/+esm');
-          const imageData = await decode(await file.arrayBuffer());
-          return fromImageData(imageData);
-        }catch(err){ console.warn('JPEG XL 解碼失敗', err); }
-      }
-
-      return null;
-    }
-
-    async function makeWebpThumb(file){
-      const canvas = await decodeToCanvas(file);
-      if(!canvas) return null;
-      const blob = await new Promise(res=> canvas.toBlob(res, 'image/webp', 0.82));
-      // 少數瀏覽器（如 Safari）不支援輸出 WebP，會拿到 null 或別的格式，就退回 JPEG
-      if(blob && blob.type === 'image/webp') return { blob, ext: 'webp', type: 'image/webp' };
-      const jpg = await new Promise(res=> canvas.toBlob(res, 'image/jpeg', 0.85));
-      return jpg ? { blob: jpg, ext: 'jpg', type: 'image/jpeg' } : null;
-    }
-
     let selectedFiles = [];
     const photoInput = document.getElementById('photoInput');
     const uploadZoneText = document.getElementById('uploadZoneText');
@@ -802,29 +810,33 @@
       const renderProgress = ()=> progressEl.innerHTML = lines.map(l=> escapeHtml(l)).join('<br>');
       renderProgress();
 
-      for(let i = 0; i < files.length; i++){
+      // 加速策略：每張照片的「上傳原始檔」和「轉 WebP」互不依賴，同時進行；
+      // 並且一次處理 3 張（轉檔吃 CPU、上傳吃網路，交錯跑最有效率）
+      const CONCURRENCY = 3;
+      async function processOne(i){
         const file = files[i];
-        let step = '轉檔';
+        let step = '上傳原始檔＋轉檔';
+        const ts = Date.now() + i; // 加上序號，避免同一毫秒選多張撞檔名
+        const origPath = `gallery/orig/${ts}_${file.name}`;
+        const origRef = ref(storage, origPath);
         try{
-          lines[i] = `🔄 ${file.name}：轉 WebP 縮圖中…`; renderProgress();
-          const thumb = await makeWebpThumb(file);
+          lines[i] = `🔄 ${file.name}：上傳原始檔＋轉 WebP 中…`; renderProgress();
+          const [, thumb] = await Promise.all([
+            uploadBytes(origRef, file, {
+              ...IMG_CACHE_META,
+              // 強制當附件下載：前台按下載鈕會直接存檔，不會開新視窗顯示圖片
+              contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`
+            }),
+            makeWebpThumb(file, 1600)
+          ]);
           if(!thumb){
-            // 轉不出縮圖就整張不發布，確保照片牆上永遠只有 WebP、不會出現破圖
+            // 轉不出縮圖就整張不發布，確保照片牆上永遠只有 WebP、不會出現破圖；
+            // 已經傳上去的原始檔也順手清掉，不留孤兒檔案
+            try{ await deleteObject(origRef); }catch(e){}
             lines[i] = `❌ ${file.name}：無法解碼這個格式，未發布（請確認檔案沒壞，或回報我加上這個格式的支援）`;
             renderProgress();
-            continue;
+            return;
           }
-
-          const ts = Date.now();
-          step = '上傳原始檔';
-          lines[i] = `🔄 ${file.name}：上傳原始檔中…`; renderProgress();
-          const origPath = `gallery/orig/${ts}_${file.name}`;
-          const origRef = ref(storage, origPath);
-          await uploadBytes(origRef, file, {
-            ...IMG_CACHE_META,
-            // 強制當附件下載：前台按下載鈕會直接存檔，不會開新視窗顯示圖片
-            contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`
-          });
           const origUrl = await getDownloadURL(origRef);
 
           step = '上傳縮圖';
@@ -853,6 +865,18 @@
           renderProgress();
         }
       }
+
+      let cursor = 0;
+      const workers = [];
+      for(let w = 0; w < Math.min(CONCURRENCY, files.length); w++){
+        workers.push((async ()=>{
+          while(cursor < files.length){
+            const i = cursor++;
+            await processOne(i);
+          }
+        })());
+      }
+      await Promise.all(workers);
     };
   }
 
@@ -919,7 +943,7 @@
         selectedFursonaFile = null;
       }catch(err){
         console.error(err);
-        alert('上傳失敗，請再試一次');
+        alert('上傳失敗：' + (err && err.code ? err.code : (err && err.message) || '未知錯誤'));
       }
       spinner.style.display = 'none';
     };
@@ -957,9 +981,13 @@
       const spinner = document.getElementById('eggAvatarSpinner');
       spinner.style.display = 'block';
       try{
-        const path = `egg/avatar_${Date.now()}_${selectedEggAvatar.name}`;
+        const thumb = await makeWebpThumb(selectedEggAvatar, 512); // 彩蛋頭貼同樣顯示在小圓圈，一樣縮成 512px WebP
+        const upBlob = thumb ? thumb.blob : selectedEggAvatar;
+        const upExt  = thumb ? thumb.ext  : (selectedEggAvatar.name.split('.').pop() || 'img');
+        const upMeta = thumb ? { ...IMG_CACHE_META, contentType: thumb.type } : IMG_CACHE_META;
+        const path = `egg/avatar_${Date.now()}.${upExt}`;
         const sRef = ref(storage, path);
-        await uploadBytes(sRef, selectedEggAvatar, IMG_CACHE_META);
+        await uploadBytes(sRef, upBlob, upMeta);
         const url = await getDownloadURL(sRef);
         await setDoc(settingsRef, { stage1AvatarUrl: url, updatedAt: serverTimestamp() }, { merge:true });
         const snap = await getDoc(settingsRef);
@@ -969,7 +997,7 @@
         selectedEggAvatar = null;
       }catch(err){
         console.error(err);
-        alert('上傳失敗，請再試一次');
+        alert('上傳失敗：' + (err && err.code ? err.code : (err && err.message) || '未知錯誤'));
       }
       spinner.style.display = 'none';
     };
@@ -996,7 +1024,7 @@
         selectedEggSound = null;
       }catch(err){
         console.error(err);
-        alert('上傳失敗，請再試一次');
+        alert('上傳失敗：' + (err && err.code ? err.code : (err && err.message) || '未知錯誤'));
       }
       spinner.style.display = 'none';
     };
