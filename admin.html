@@ -172,7 +172,7 @@
   .theme-preview .tp-btn{ display:inline-block; margin-top:10px; padding:8px 16px; border-radius:12px; font-size:12px; font-weight:700; }
 </style>
 <script>
-  // 搶在畫面畫出來之前，先套用上次記住的自訂配色（跟公開網站共用同一個快取，同網域下互通）
+  // 先套用記住的配色（與前台共用同一份快取）
   (function(){
     try{
       const cached = localStorage.getItem('julian_theme_colors');
@@ -485,8 +485,7 @@
   const storage = getStorage(app);
   const provider = new GoogleAuthProvider();
 
-  // 所有上傳檔案共用的快取設定：檔名帶時間戳記、內容永不變動，
-  // 讓瀏覽器放心快取一年，前台切換頭貼/開燈箱不用每次重新下載
+  // 檔名帶時間戳記、內容不變，可放心快取一年
   const IMG_CACHE_META = { cacheControl: 'public, max-age=31536000, immutable' };
 
   const loginView = document.getElementById('loginView');
@@ -520,7 +519,7 @@
       initThemeColors();
       initFixCache();
     } else if(user){
-      // 登入了但不是你本人
+      // 非本人帳號
       loginError.style.display = 'block';
       signOut(auth);
     } else {
@@ -600,9 +599,7 @@
     };
   }
 
-  // 把任何圖檔解碼後轉成 WebP 縮圖（最長邊 maxSize px）。共用於照片牆(1600)與頭貼/彩蛋(512)。
-  // 解碼順序：瀏覽器原生（JPEG/PNG/WebP/AVIF…）→ TIFF 解碼器 → JPEG XL 解碼器。
-  // 全部失敗會回傳 null，該張照片不會發布——保證照片牆上永遠只有 WebP。
+  // 圖檔轉 WebP 縮圖（照片牆 1600 / 頭貼 512）。原生解碼失敗才載入 TIFF、JXL 解碼器；全失敗回 null 不發布
   async function decodeToCanvas(file, maxSize){
     const MAX = maxSize;
     const drawScaled = (srcW, srcH, drawFn)=>{
@@ -614,7 +611,7 @@
       return canvas;
     };
 
-    // 1) 瀏覽器原生解碼
+    // 原生解碼
     try{
       const bmp = await createImageBitmap(file);
       const c = drawScaled(bmp.width, bmp.height, (ctx, w, h)=> ctx.drawImage(bmp, 0, 0, w, h));
@@ -623,7 +620,7 @@
     }catch(err){}
 
     const name = (file.name || '').toLowerCase();
-    // ImageData 是全尺寸的，先畫到全尺寸 canvas 再縮
+    // ImageData 先畫到全尺寸再縮
     const fromImageData = (imageData)=>{
       const full = document.createElement('canvas');
       full.width = imageData.width; full.height = imageData.height;
@@ -631,7 +628,7 @@
       return drawScaled(full.width, full.height, (ctx, w, h)=> ctx.drawImage(full, 0, 0, w, h));
     };
 
-    // 2) TIFF（瀏覽器不認得，用 UTIF 解碼器現場載入）
+    // TIFF
     if(file.type === 'image/tiff' || /\.tiff?$/.test(name)){
       try{
         const mod = await import('https://cdn.jsdelivr.net/npm/utif2@4.1.0/+esm');
@@ -644,7 +641,7 @@
       }catch(err){ console.warn('TIFF 解碼失敗', err); }
     }
 
-    // 3) JPEG XL（用 WASM 解碼器現場載入）
+    // JPEG XL
     if(file.type === 'image/jxl' || /\.jxl$/.test(name)){
       try{
         const { decode } = await import('https://cdn.jsdelivr.net/npm/@jsquash/jxl@1/+esm');
@@ -660,7 +657,7 @@
     const canvas = await decodeToCanvas(file, maxSize);
     if(!canvas) return null;
     const blob = await new Promise(res=> canvas.toBlob(res, 'image/webp', 0.82));
-    // 少數瀏覽器（如 Safari）不支援輸出 WebP，會拿到 null 或別的格式，就退回 JPEG
+    // Safari 輸出不了 WebP 就退回 JPEG
     if(blob && blob.type === 'image/webp') return { blob, ext: 'webp', type: 'image/webp' };
     const jpg = await new Promise(res=> canvas.toBlob(res, 'image/jpeg', 0.85));
     return jpg ? { blob: jpg, ext: 'jpg', type: 'image/jpeg' } : null;
@@ -727,10 +724,9 @@
         let maxOrder = 0;
         snap.forEach(d=>{ const o = d.data().order || 0; if(o > maxOrder) maxOrder = o; });
 
-        // 頭貼只顯示在 92px 的小圓圈，轉成 512px WebP 就綽綽有餘（含高解析螢幕），
-        // 檔案從幾 MB 縮到幾十 KB，前台循環切換的解碼時間趨近於零
+        // 頭貼顯示區只有 92px，512px WebP 綽綽有餘
         const thumb = await makeWebpThumb(selectedAvatarFile, 512);
-        const upBlob = thumb ? thumb.blob : selectedAvatarFile; // 罕見格式轉不動就退回原檔
+        const upBlob = thumb ? thumb.blob : selectedAvatarFile; // 轉不動退回原檔
         const upExt  = thumb ? thumb.ext  : (selectedAvatarFile.name.split('.').pop() || 'img');
         const upMeta = thumb ? { ...IMG_CACHE_META, contentType: thumb.type } : IMG_CACHE_META;
 
@@ -799,7 +795,7 @@
       if(!selectedFiles.length) return;
       const files = selectedFiles;
       const caption = document.getElementById('photoCaption').value.trim();
-      // 立刻釋放選擇器：這批在背景跑的同時，馬上就能再選下一批
+      // 立刻釋放選擇器，可馬上選下一批
       selectedFiles = [];
       photoInput.value = '';
       uploadZoneText.textContent = '📷 點擊選擇照片（可一次選多張）';
@@ -810,13 +806,12 @@
       const renderProgress = ()=> progressEl.innerHTML = lines.map(l=> escapeHtml(l)).join('<br>');
       renderProgress();
 
-      // 加速策略：每張照片的「上傳原始檔」和「轉 WebP」互不依賴，同時進行；
-      // 並且一次處理 3 張（轉檔吃 CPU、上傳吃網路，交錯跑最有效率）
+      // 上傳原檔與轉檔同時進行，一次跑 3 張
       const CONCURRENCY = 3;
       async function processOne(i){
         const file = files[i];
         let step = '上傳原始檔＋轉檔';
-        const ts = Date.now() + i; // 加上序號，避免同一毫秒選多張撞檔名
+        const ts = Date.now() + i; // 防同毫秒撞檔名
         const origPath = `gallery/orig/${ts}_${file.name}`;
         const origRef = ref(storage, origPath);
         try{
@@ -824,14 +819,13 @@
           const [, thumb] = await Promise.all([
             uploadBytes(origRef, file, {
               ...IMG_CACHE_META,
-              // 強制當附件下載：前台按下載鈕會直接存檔，不會開新視窗顯示圖片
+              // 附件標頭：前台點下載直接存檔
               contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`
             }),
             makeWebpThumb(file, 1600)
           ]);
           if(!thumb){
-            // 轉不出縮圖就整張不發布，確保照片牆上永遠只有 WebP、不會出現破圖；
-            // 已經傳上去的原始檔也順手清掉，不留孤兒檔案
+            // 轉不出縮圖就不發布，並清掉已上傳的原檔
             try{ await deleteObject(origRef); }catch(e){}
             lines[i] = `❌ ${file.name}：無法解碼這個格式，未發布（請確認檔案沒壞，或回報我加上這個格式的支援）`;
             renderProgress();
@@ -849,9 +843,9 @@
           step = '寫入資料庫';
           lines[i] = `🔄 ${file.name}：寫入資料庫中…`; renderProgress();
           await addDoc(colRef, {
-            imageUrl: thumbUrl,        // 照片牆/燈箱顯示用（WebP 縮圖）
+            imageUrl: thumbUrl,        // 顯示用縮圖
             storagePath: thumbPath,
-            originalUrl: origUrl,      // 燈箱「下載原圖」按鈕用（原始檔完整保留）
+            originalUrl: origUrl,      // 下載用原檔
             originalPath: origPath,
             originalName: file.name,
             caption,
@@ -860,7 +854,7 @@
           lines[i] = `✅ ${file.name}：完成`; renderProgress();
         }catch(err){
           console.error(`上傳失敗（${file.name}，卡在「${step}」）`, err);
-          // 明確標出是哪一步、什麼錯誤，不再用籠統的「上傳失敗」彈窗誤導
+          // 標出失敗步驟與錯誤碼
           lines[i] = `❌ ${file.name}：失敗於「${step}」（${err && err.code ? err.code : (err && err.message) || '未知錯誤'}）`;
           renderProgress();
         }
@@ -981,7 +975,7 @@
       const spinner = document.getElementById('eggAvatarSpinner');
       spinner.style.display = 'block';
       try{
-        const thumb = await makeWebpThumb(selectedEggAvatar, 512); // 彩蛋頭貼同樣顯示在小圓圈，一樣縮成 512px WebP
+        const thumb = await makeWebpThumb(selectedEggAvatar, 512);
         const upBlob = thumb ? thumb.blob : selectedEggAvatar;
         const upExt  = thumb ? thumb.ext  : (selectedEggAvatar.name.split('.').pop() || 'img');
         const upMeta = thumb ? { ...IMG_CACHE_META, contentType: thumb.type } : IMG_CACHE_META;
@@ -1077,9 +1071,9 @@
     };
   }
 
-  // ---------- 圖片快取修復（把舊檔案的 metadata 補上快取設定） ----------
+  // ---------- 圖片快取修復 ----------
   function initFixCache(){
-    // 從下載網址反推 Storage 路徑（彩蛋檔案當初只存了網址、沒存路徑，用這個補救）
+    // 從下載網址反推 Storage 路徑（彩蛋檔案只存了網址）
     function pathFromDownloadUrl(url){
       try{
         const m = (url || '').match(/\/o\/([^?]+)/);
@@ -1094,7 +1088,7 @@
       status.style.display = 'block';
       status.textContent = '整理檔案清單中…';
 
-      // 收集所有已知檔案的 Storage 路徑（原始檔另外標記，要多補「強制下載」設定）
+      // 收集所有檔案路徑；原始檔要多補附件標頭
       const paths = new Set();
       const origPaths = new Set();
       for(const colName of ['avatars', 'gallery', 'fursonas']){
@@ -1209,7 +1203,7 @@
   function applyThemeToAdmin(hex1, hex2, hex3){
     const root = document.documentElement.style;
     if(!hex1 || !hex2 || !hex3){
-      // 空值：清掉手動覆寫，讓 :root 預設值生效
+      // 空值＝清掉覆寫
       ['--rust','--moss','--bg-base','--ink','--muted','--line','--glass','--glass-strong',
        '--bg-radial-1','--bg-radial-2','--bg-radial-3','--bg-radial-4'].forEach(p=> root.removeProperty(p));
       try{ localStorage.removeItem('julian_theme_colors'); }catch(err){}
