@@ -155,6 +155,7 @@
     background: var(--glass-strong);
   }
   .upload-zone input{ display:none; }
+  .upload-zone.dragover{ border-color: var(--rust); border-style:solid; background: var(--glass); color: var(--ink); }
   .empty{ font-size:12px; color:var(--muted); text-align:center; padding:20px 0; }
   .spinner{ font-size:12px; color:var(--muted); text-align:center; padding:10px 0; }
 
@@ -315,7 +316,7 @@
       <div class="card">
         <h2>上傳照片</h2>
         <label class="upload-zone" id="uploadZone">
-          <span id="uploadZoneText">📷 點擊選擇照片（可一次選多張）</span>
+          <span id="uploadZoneText">📷 點擊選擇照片（可一次選多張，或直接拖曳檔案到這裡）</span>
           <input type="file" id="photoInput" accept="image/*,.jxl,.tif,.tiff" multiple>
         </label>
         <label>圖說（選填，套用到這批全部照片）</label>
@@ -788,7 +789,26 @@
       selectedFiles = [...(e.target.files || [])];
       uploadZoneText.textContent = selectedFiles.length
         ? `已選擇 ${selectedFiles.length} 張：${selectedFiles.map(f=>f.name).join('、')}`
-        : '📷 點擊選擇照片（可一次選多張）';
+        : '📷 點擊選擇照片（可一次選多張，或直接拖曳檔案到這裡）';
+    });
+
+    // 拖放上傳：把圖片檔拖到上傳區即可，效果等同用選擇器挑檔
+    const dropZone = document.getElementById('uploadZone');
+    ['dragenter','dragover'].forEach(ev=>
+      dropZone.addEventListener(ev, (e)=>{ e.preventDefault(); dropZone.classList.add('dragover'); })
+    );
+    ['dragleave','dragend'].forEach(ev=>
+      dropZone.addEventListener(ev, (e)=>{ e.preventDefault(); dropZone.classList.remove('dragover'); })
+    );
+    dropZone.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const dropped = [...(e.dataTransfer.files || [])].filter(f=>
+        f.type.startsWith('image/') || /\.(jxl|tiff?)$/i.test(f.name)
+      );
+      if(!dropped.length) return;
+      selectedFiles = dropped;
+      uploadZoneText.textContent = `已選擇 ${selectedFiles.length} 張：${selectedFiles.map(f=>f.name).join('、')}`;
     });
 
     document.getElementById('uploadBtn').onclick = async ()=>{
@@ -798,7 +818,7 @@
       // 立刻釋放選擇器，可馬上選下一批
       selectedFiles = [];
       photoInput.value = '';
-      uploadZoneText.textContent = '📷 點擊選擇照片（可一次選多張）';
+      uploadZoneText.textContent = '📷 點擊選擇照片（可一次選多張，或直接拖曳檔案到這裡）';
       document.getElementById('photoCaption').value = '';
 
       progressEl.style.display = 'block';
@@ -1304,6 +1324,11 @@
     d.textContent = str;
     return d.innerHTML;
   }
+
+  // 防止把檔案拖到上傳區以外的地方時，瀏覽器直接開啟該檔案（會離開後台頁面）
+  ['dragover','drop'].forEach(ev=>
+    window.addEventListener(ev, (e)=>{ e.preventDefault(); }, false)
+  );
 </script>
 </body>
 </html>
