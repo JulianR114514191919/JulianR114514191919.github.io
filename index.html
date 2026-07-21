@@ -255,6 +255,44 @@
     display:block; cursor:pointer; color:var(--ink); position:relative;
   }
   .pin img{ width:100%; display:block; }
+  .album-pin{ position:relative; cursor:pointer; }
+  .album-pin::before, .album-pin::after{
+    content:''; position:absolute; left:4px; right:4px; border-radius:16px; background:var(--glass-strong);
+  }
+  .album-pin::before{ top:-6px; height:20px; opacity:.55; }
+  .album-pin::after{ top:-3px; height:20px; opacity:.8; }
+  .album-pin img{ position:relative; z-index:1; aspect-ratio:1/1; object-fit:cover; }
+  .album-pin .album-cover-ph{
+    position:relative; z-index:1; aspect-ratio:1/1; border-radius:16px;
+    background:linear-gradient(135deg, var(--rust), var(--moss));
+    display:flex; align-items:center; justify-content:center; font-size:34px;
+  }
+  .album-pin .aname{
+    position:absolute; left:0; right:0; bottom:0; z-index:2; padding:18px 10px 8px;
+    background:linear-gradient(transparent, rgba(0,0,0,.6)); color:#fff;
+    font-size:12px; font-weight:700; border-radius:0 0 16px 16px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .album-panel{
+    position:fixed; inset:0; z-index:70; display:none; flex-direction:column;
+    background:var(--bg-base); overflow:hidden;
+    transform-origin:center; opacity:0;
+  }
+  .album-panel.open{ display:flex; }
+  .album-panel .ap-head{
+    display:flex; align-items:center; gap:10px;
+    padding:calc(14px + env(safe-area-inset-top)) 16px 10px;
+  }
+  .album-panel .ap-back{
+    width:36px; height:36px; border-radius:50%; border:none; cursor:pointer;
+    background:var(--glass-strong); color:var(--ink); font-size:16px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .album-panel .ap-title{ font-size:17px; font-weight:800; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .album-panel .ap-count{ font-size:12px; color:var(--muted); }
+  .album-panel .ap-body{ flex:1; overflow-y:auto; padding:6px 14px calc(20px + env(safe-area-inset-bottom)); }
+  .album-panel .masonry{ columns:2; column-gap:10px; }
+
   .pin .cap{ font-size:11px; font-weight:700; padding:8px 10px; }
   .albumbtn{
     display:block; text-align:center; margin-top:14px; padding:13px; border-radius:16px;
@@ -691,6 +729,15 @@
     </div>
   </div>
 
+  <div class="album-panel" id="albumPanel">
+    <div class="ap-head">
+      <button class="ap-back" id="albumPanelBack">←</button>
+      <div class="ap-title" id="albumPanelTitle"></div>
+      <div class="ap-count" id="albumPanelCount"></div>
+    </div>
+    <div class="ap-body"><div class="masonry" id="albumMasonry"></div></div>
+  </div>
+
   <div class="lightbox-overlay" id="lightboxOverlay">
     <button class="lightbox-close" id="lightboxClose">✕</button>
     <button class="lightbox-download" id="lightboxDownload" title="下載原始檔"><span class="dl-ic">⬇</span><span class="dl-label">完整圖片下載</span></button>
@@ -988,6 +1035,8 @@
   let wheelLock = false;
   app.addEventListener('wheel', e=>{
     if(wheelLock || looping || calOpen) return;
+    // 游標在照片牆卡片內：滾輪永遠只捲照片，絕不翻頁
+    if(e.target instanceof Element && e.target.closest('#p4, .masonry, .album-panel')) return;
     const vertical = Math.abs(e.deltaY) > Math.abs(e.deltaX);
     if(vertical && innerCanScroll(e.target, e.deltaY)) return;
     const delta = vertical ? e.deltaY : e.deltaX;
@@ -1441,28 +1490,130 @@
   const masonryMain = document.getElementById('masonryMain');
   const masonryClone = document.getElementById('masonryClone');
 
-  function renderGallery(photos){
-    window.lightboxPhotos = photos;
-    if(photos.length === 0){
+  let galleryPhotos = [];
+  let galleryAlbums = [];
+
+  function effOrder(x){
+    if(typeof x.order === 'number') return x.order;
+    const t = x.uploadedAt && x.uploadedAt.toMillis ? x.uploadedAt.toMillis() : 0;
+    return -t;
+  }
+
+  function pinHtml(p){
+    return `
+      <div class="pin" data-photo-id="${p.id}">
+        <img src="${p.imageUrl}" alt="${escapeHtml(p.caption||'')}" decoding="async" loading="lazy">
+        ${p.caption ? `<div class="cap">${escapeHtml(p.caption)}</div>` : ''}
+      </div>`;
+  }
+
+  function albumPinHtml(al){
+    const inAlbum = galleryPhotos.filter(p=> p.albumId === al.id).sort((a,b)=> effOrder(a)-effOrder(b));
+    const cover = galleryPhotos.find(p=> p.id === al.coverPhotoId) || inAlbum[0];
+    return `
+      <div class="pin album-pin" data-album-id="${al.id}">
+        ${cover ? `<img src="${cover.imageUrl}" alt="${escapeHtml(al.name)}" decoding="async" loading="lazy">` : `<div class="album-cover-ph">📁</div>`}
+        <div class="aname">${escapeHtml(al.name)}　${inAlbum.length}</div>
+      </div>`;
+  }
+
+  function renderGallery(){
+    const scattered = galleryPhotos.filter(p=> !p.albumId);
+    const merged = [
+      ...scattered.map(p=> ({ kind:'photo', it:p })),
+      ...galleryAlbums.map(a=> ({ kind:'album', it:a }))
+    ].sort((a,b)=> effOrder(a.it) - effOrder(b.it));
+
+    window.lightboxPhotos = merged.filter(m=> m.kind==='photo').map(m=> m.it);
+
+    if(!merged.length){
       masonryMain.innerHTML = '<div class="cal-empty">還沒有上傳照片，敬請期待</div>';
       masonryClone.innerHTML = '';
       return;
     }
-    const html = photos.map(p => `
-      <div class="pin">
-        <img src="${p.imageUrl}" alt="${escapeHtml(p.caption||'')}" decoding="async" loading="lazy">
-        ${p.caption ? `<div class="cap">${escapeHtml(p.caption)}</div>` : ''}
-      </div>
-    `).join('');
+    const html = merged.map(m=> m.kind==='album' ? albumPinHtml(m.it) : pinHtml(m.it)).join('');
     masonryMain.innerHTML = html;
     masonryClone.innerHTML = html;
 
-    masonryMain.querySelectorAll('.pin').forEach((el, idx)=>{
-      el.addEventListener('click', ()=>{
-        if(typeof window.openLightbox === 'function') window.openLightbox(idx);
-      });
+    let photoIdx = 0;
+    masonryMain.querySelectorAll('.pin').forEach(el=>{
+      if(el.dataset.albumId){
+        el.addEventListener('click', ()=> openAlbumPanel(el.dataset.albumId, el));
+      }else{
+        const idx = photoIdx++;
+        el.addEventListener('click', ()=>{
+          if(typeof window.openLightbox === 'function') window.openLightbox(idx);
+        });
+      }
     });
   }
+
+  // ---------- 相簿展開面板（仿 Apple 相簿：從方塊放大展開，返回縮回） ----------
+  const albumPanel = document.getElementById('albumPanel');
+  const albumMasonry = document.getElementById('albumMasonry');
+  let albumSourceTile = null;
+
+  function panelTransformToTile(tile){
+    const r = tile.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const s = Math.max(r.width / vw, 0.06);
+    const tx = (r.left + r.width/2) - vw/2;
+    const ty = (r.top + r.height/2) - vh/2;
+    return `translate(${tx}px, ${ty}px) scale(${s})`;
+  }
+
+  function openAlbumPanel(albumId, tile){
+    const al = galleryAlbums.find(a=> a.id === albumId);
+    if(!al) return;
+    albumSourceTile = tile || null;
+    const items = galleryPhotos.filter(p=> p.albumId === albumId).sort((a,b)=> effOrder(a)-effOrder(b));
+
+    document.getElementById('albumPanelTitle').textContent = al.name;
+    document.getElementById('albumPanelCount').textContent = items.length ? `${items.length} 張` : '';
+    albumMasonry.innerHTML = items.length
+      ? items.map(pinHtml).join('')
+      : '<div class="cal-empty">這個相簿還沒有照片</div>';
+
+    albumMasonry.querySelectorAll('.pin').forEach((el, idx)=>{
+      el.addEventListener('click', ()=>{
+        if(typeof window.openLightbox === 'function'){
+          window.openLightbox(idx, items, ix=> albumMasonry.querySelectorAll('.pin img')[ix]);
+        }
+      });
+    });
+
+    albumPanel.classList.add('open');
+    albumPanel.style.transition = 'none';
+    albumPanel.style.transform = tile ? panelTransformToTile(tile) : 'scale(0.9)';
+    albumPanel.style.opacity = '0';
+    albumPanel.style.borderRadius = '20px';
+    void albumPanel.offsetWidth;
+    albumPanel.style.transition = 'transform .38s cubic-bezier(0.32,0.72,0,1), opacity .3s ease, border-radius .38s ease';
+    albumPanel.style.transform = 'none';
+    albumPanel.style.opacity = '1';
+    albumPanel.style.borderRadius = '0px';
+  }
+
+  function closeAlbumPanel(){
+    const tile = albumSourceTile;
+    const target = tile && document.body.contains(tile) ? panelTransformToTile(tile) : 'scale(0.92)';
+    albumPanel.style.transition = 'transform .32s cubic-bezier(0.32,0.72,0,1), opacity .26s ease .06s, border-radius .32s ease';
+    albumPanel.style.transform = target;
+    albumPanel.style.opacity = '0';
+    albumPanel.style.borderRadius = '20px';
+    setTimeout(()=>{
+      albumPanel.classList.remove('open');
+      albumPanel.style.transition = 'none';
+      albumPanel.style.transform = '';
+    }, 340);
+  }
+  document.getElementById('albumPanelBack').addEventListener('click', closeAlbumPanel);
+  window.addEventListener('keydown', (e)=>{
+    if(e.key !== 'Escape') return;
+    const lb = document.getElementById('lightboxOverlay');
+    if(lb && lb.classList.contains('open')) return;
+    if(albumPanel.classList.contains('open')) closeAlbumPanel();
+  });
 
   (function(){
     const overlay = document.getElementById('lightboxOverlay');
@@ -1514,7 +1665,7 @@
     window.openLightbox = function(i, list, getSourceEl){
       currentList = list || window.lightboxPhotos || [];
       if(!currentList.length) return;
-      sourceGetter = getSourceEl || (ix => masonryMain.querySelectorAll('.pin img')[ix]);
+      sourceGetter = getSourceEl || (ix => masonryMain.querySelectorAll('.pin:not(.album-pin) img')[ix]);
       idx = Math.max(0, Math.min(i, currentList.length - 1));
       imgEl.style.transition = 'none';
       imgEl.style.transform = '';
@@ -1643,15 +1794,19 @@
 
   function startGalleryListening(){
     try{
-      const q = query(collection(db, 'gallery'), orderBy('uploadedAt', 'desc'));
-      onSnapshot(q, (snap)=>{
-        const photos = [];
-        snap.forEach(d=> photos.push(d.data()));
-        cacheImages(photos.map(p=> p.imageUrl));
-        renderGallery(photos);
+      onSnapshot(query(collection(db, 'gallery'), orderBy('uploadedAt', 'desc')), (snap)=>{
+        galleryPhotos = [];
+        snap.forEach(d=> galleryPhotos.push({ id:d.id, ...d.data() }));
+        cacheImages(galleryPhotos.map(p=> p.imageUrl));
+        renderGallery();
       }, ()=>{
         masonryMain.innerHTML = '<div class="cal-empty">還沒有上傳照片，敬請期待</div>';
       });
+      onSnapshot(collection(db, 'albums'), (snap)=>{
+        galleryAlbums = [];
+        snap.forEach(d=> galleryAlbums.push({ id:d.id, ...d.data() }));
+        renderGallery();
+      }, ()=>{});
     }catch(err){
       masonryMain.innerHTML = '<div class="cal-empty">還沒有上傳照片，敬請期待</div>';
     }
