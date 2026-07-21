@@ -157,43 +157,47 @@
   .upload-zone input{ display:none; }
   .upload-zone.dragover{ border-color: var(--rust); border-style:solid; background: var(--glass); color: var(--ink); }
 
-  /* 照片牆排列編輯器 */
-  .wall-editor{ display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+  /* 照片牆排列編輯器：跟前台同規格的兩欄瀑布流，照片保留原始長寬比 */
+  .wall-editor{ column-count:2; column-gap:10px; max-width:420px; margin:0 auto; }
+  .wall-editor .wall-head{ column-span:all; display:flex; align-items:center; gap:10px; padding-bottom:8px; flex-wrap:wrap; }
   .wtile{
-    position:relative; border-radius:14px; overflow:visible; aspect-ratio:1/1;
-    cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none;
+    position:relative; break-inside:avoid; margin-bottom:10px; border-radius:16px;
+    border:1px solid var(--line); background:var(--glass-strong);
+    cursor:grab; user-select:none; -webkit-user-select:none;
+    transition: transform .18s ease, box-shadow .18s ease;
   }
-  .wtile img{ width:100%; height:100%; object-fit:cover; border-radius:14px; display:block; pointer-events:none; }
+  .wtile img{ width:100%; height:auto; display:block; border-radius:16px; pointer-events:none; }
+  .wtile.lifted{
+    transform:scale(1.05); z-index:5;
+    box-shadow:0 12px 30px rgba(0,0,0,.35);
+    cursor:grabbing;
+  }
   .wtile.dragging{ opacity:.35; }
+  .wtile.drop-target{ transform:scale(1.04); }
   .wtile.drop-target::after{
-    content:''; position:absolute; inset:-3px; border:2.5px solid var(--rust); border-radius:16px; pointer-events:none;
+    content:''; position:absolute; inset:-3px; border:2.5px solid var(--rust); border-radius:18px; pointer-events:none;
   }
+  .sortable-fallback{ pointer-events:none; opacity:.92 !important; }
   .wtile .wdel{
     position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
     background:rgba(0,0,0,.55); color:#fff; border:none; font-size:12px; cursor:pointer; z-index:2;
     display:flex; align-items:center; justify-content:center;
   }
-  .wtile.album-tile{ cursor:grab; }
   .wtile.album-tile .astack{
-    position:absolute; inset:0; border-radius:14px;
-    background: var(--glass-strong); box-shadow: 0 3px 0 -1px var(--glass-strong), 0 6px 0 -2px var(--glass);
+    position:absolute; left:4px; right:4px; top:-5px; height:18px; border-radius:14px;
+    background:var(--glass-strong); opacity:.7;
   }
-  .wtile.album-tile img{ position:relative; z-index:1; }
+  .wtile.album-tile img{ position:relative; z-index:1; aspect-ratio:1/1; object-fit:cover; }
   .wtile.album-tile .aname{
     position:absolute; left:0; right:0; bottom:0; z-index:2; padding:14px 8px 6px;
     background:linear-gradient(transparent, rgba(0,0,0,.55)); color:#fff;
-    font-size:11px; font-weight:700; border-radius:0 0 14px 14px;
+    font-size:11px; font-weight:700; border-radius:0 0 16px 16px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
   .wtile .placeholder-cover{
-    width:100%; height:100%; border-radius:14px; display:flex; align-items:center; justify-content:center;
+    width:100%; aspect-ratio:1/1; border-radius:16px; display:flex; align-items:center; justify-content:center;
     font-size:26px; background:linear-gradient(135deg, var(--rust), var(--moss)); position:relative; z-index:1;
   }
-  .wall-ghost{
-    position:fixed; z-index:999; pointer-events:none; width:90px; height:90px;
-    border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.35); opacity:.92; transform:translate(-50%,-50%) scale(1.05);
-  }
-  .wall-ghost img{ width:100%; height:100%; object-fit:cover; }
   .album-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); }
   .album-row:last-child{ border-bottom:none; }
   .album-row img, .album-row .placeholder-cover{ width:44px; height:44px; border-radius:10px; object-fit:cover; flex-shrink:0; font-size:18px; }
@@ -974,7 +978,7 @@
         const al = albums.find(a=> a.id === openAlbumId);
         if(!al){ openAlbumId = null; renderWall(); return; }
         const head = document.createElement('div');
-        head.style.cssText = 'grid-column:1/-1; display:flex; align-items:center; gap:10px; padding-bottom:4px; flex-wrap:wrap;';
+        head.className = 'wall-head';
         head.innerHTML = `<button class="btn" id="albumBackBtn" style="width:auto; padding:6px 12px;">← 回主牆</button><b style="font-size:13.5px;">${escapeHtml(al.name)}</b><span style="font-size:11px; color:var(--muted);">☆ 設封面　⬆ 移回主牆</span>`;
         wall.appendChild(head);
         head.querySelector('#albumBackBtn').onclick = ()=>{ openAlbumId = null; renderWall(); };
@@ -982,7 +986,7 @@
         const items = albumPhotos(openAlbumId);
         if(!items.length){
           const empty = document.createElement('div');
-          empty.className = 'empty'; empty.style.gridColumn = '1/-1';
+          empty.className = 'empty'; empty.style.columnSpan = 'all';
           empty.textContent = '這個相簿還沒有照片：把主牆的照片拖到相簿方塊上放開，或上傳時直接選這個相簿';
           wall.appendChild(empty);
           return;
@@ -990,7 +994,7 @@
         items.forEach(p=> wall.appendChild(makePhotoTile(p, true)));
         sortables.push(new Sortable(wall, {
           animation:150, delay:200, delayOnTouchOnly:true, draggable:'.wtile',
-          ghostClass:'dragging',
+          ghostClass:'dragging', chosenClass:'lifted',
           onStart:()=>{ draggingNow = true; },
           onEnd: async ()=>{
             draggingNow = false;
@@ -1010,21 +1014,48 @@
       if(!merged.length){ wall.innerHTML = '<div class="empty">還沒有照片</div>'; return; }
       merged.forEach(m=> wall.appendChild(m.kind === 'album' ? makeAlbumTile(m.it) : makePhotoTile(m.it, false)));
 
+      let lastXY = null;
+      const trackXY = (e)=>{
+        const t = e.touches ? e.touches[0] : e;
+        lastXY = { x: t.clientX, y: t.clientY };
+      };
       sortables.push(new Sortable(wall, {
         animation:150, delay:200, delayOnTouchOnly:true, draggable:'.wtile',
-        ghostClass:'dragging',
-        onStart:()=>{ draggingNow = true; },
-        onMove:(evt)=>{
+        ghostClass:'dragging', chosenClass:'lifted',
+        onStart:()=>{
+          draggingNow = true;
+          window.addEventListener('pointermove', trackXY, {passive:true});
+          window.addEventListener('touchmove', trackXY, {passive:true});
+        },
+        onMove:(evt, oe)=>{
           wall.querySelectorAll('.drop-target').forEach(x=> x.classList.remove('drop-target'));
-          if(evt.dragged.dataset.kind === 'photo' && evt.related && evt.related.dataset && evt.related.dataset.kind === 'album' && evt.willInsertAfter === false){
-            evt.related.classList.add('drop-target');
+          if(evt.dragged.dataset.kind === 'photo' && evt.related && evt.related.classList.contains('album-tile')){
+            // 命中相簿的中心區域＝要收進去：高亮、且回傳 false 讓相簿不被推移；
+            // 命中邊緣＝想把照片排在相簿旁邊：照常允許插入
+            const r = evt.related.getBoundingClientRect();
+            const t = oe && (oe.touches ? oe.touches[0] : oe);
+            if(t){
+              const mx = (t.clientX - r.left) / r.width;
+              const my = (t.clientY - r.top) / r.height;
+              if(mx > 0.18 && mx < 0.82 && my > 0.18 && my < 0.82){
+                evt.related.classList.add('drop-target');
+                return false;
+              }
+            }
           }
           return true;
         },
         onEnd: async (evt)=>{
           draggingNow = false;
-          const target = wall.querySelector('.drop-target');
+          window.removeEventListener('pointermove', trackXY);
+          window.removeEventListener('touchmove', trackXY);
+          let target = wall.querySelector('.drop-target');
+          if(!target && lastXY && evt.item.dataset.kind === 'photo'){
+            const under = document.elementFromPoint(lastXY.x, lastXY.y);
+            if(under) target = under.closest('.album-tile');
+          }
           wall.querySelectorAll('.drop-target').forEach(x=> x.classList.remove('drop-target'));
+          lastXY = null;
           if(target && evt.item.dataset.kind === 'photo'){
             await setDoc(doc(db,'gallery', evt.item.dataset.id), { albumId: target.dataset.id, order: -Date.now() }, { merge:true });
           }else{
