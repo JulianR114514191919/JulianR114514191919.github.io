@@ -1000,7 +1000,7 @@
         sortables.push(new Sortable(wall, {
           animation:150, delay:200, delayOnTouchOnly:true, draggable:'.wtile',
           ghostClass:'dragging', chosenClass:'lifted',
-          fallbackOnBody:true, touchStartThreshold:8, fallbackTolerance:4,
+          forceFallback:true, fallbackOnBody:true, touchStartThreshold:8, fallbackTolerance:4,
           onStart:()=>{ draggingNow = true; },
           onEnd: async ()=>{
             draggingNow = false;
@@ -1028,7 +1028,7 @@
       sortables.push(new Sortable(wall, {
         animation:150, delay:200, delayOnTouchOnly:true, draggable:'.wtile',
         ghostClass:'dragging', chosenClass:'lifted',
-        fallbackOnBody:true, touchStartThreshold:8, fallbackTolerance:4,
+        forceFallback:true, fallbackOnBody:true, touchStartThreshold:8, fallbackTolerance:4,
         onStart:()=>{
           draggingNow = true;
           window.addEventListener('pointermove', trackXY, {passive:true});
