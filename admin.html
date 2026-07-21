@@ -177,7 +177,12 @@
   .wtile.drop-target::after{
     content:''; position:absolute; inset:-3px; border:2.5px solid var(--rust); border-radius:18px; pointer-events:none;
   }
-  .sortable-fallback{ pointer-events:none; opacity:.92 !important; }
+  .sortable-fallback{
+    pointer-events:none; opacity:.92 !important; z-index:999;
+    border-radius:16px; overflow:hidden;
+    box-shadow:0 14px 34px rgba(0,0,0,.4);
+    transform:scale(1.05);
+  }
   .wtile .wdel{
     position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
     background:rgba(0,0,0,.55); color:#fff; border:none; font-size:12px; cursor:pointer; z-index:2;
@@ -995,6 +1000,7 @@
         sortables.push(new Sortable(wall, {
           animation:150, delay:200, delayOnTouchOnly:true, draggable:'.wtile',
           ghostClass:'dragging', chosenClass:'lifted',
+          fallbackOnBody:true, touchStartThreshold:8, fallbackTolerance:4,
           onStart:()=>{ draggingNow = true; },
           onEnd: async ()=>{
             draggingNow = false;
@@ -1022,6 +1028,7 @@
       sortables.push(new Sortable(wall, {
         animation:150, delay:200, delayOnTouchOnly:true, draggable:'.wtile',
         ghostClass:'dragging', chosenClass:'lifted',
+        fallbackOnBody:true, touchStartThreshold:8, fallbackTolerance:4,
         onStart:()=>{
           draggingNow = true;
           window.addEventListener('pointermove', trackXY, {passive:true});
