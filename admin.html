@@ -156,6 +156,51 @@
   }
   .upload-zone input{ display:none; }
   .upload-zone.dragover{ border-color: var(--rust); border-style:solid; background: var(--glass); color: var(--ink); }
+
+  /* 照片牆排列編輯器 */
+  .wall-editor{ display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+  .wtile{
+    position:relative; border-radius:14px; overflow:visible; aspect-ratio:1/1;
+    cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none;
+  }
+  .wtile img{ width:100%; height:100%; object-fit:cover; border-radius:14px; display:block; pointer-events:none; }
+  .wtile.dragging{ opacity:.35; }
+  .wtile.drop-target::after{
+    content:''; position:absolute; inset:-3px; border:2.5px solid var(--rust); border-radius:16px; pointer-events:none;
+  }
+  .wtile .wdel{
+    position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
+    background:rgba(0,0,0,.55); color:#fff; border:none; font-size:12px; cursor:pointer; z-index:2;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .wtile.album-tile{ cursor:grab; }
+  .wtile.album-tile .astack{
+    position:absolute; inset:0; border-radius:14px;
+    background: var(--glass-strong); box-shadow: 0 3px 0 -1px var(--glass-strong), 0 6px 0 -2px var(--glass);
+  }
+  .wtile.album-tile img{ position:relative; z-index:1; }
+  .wtile.album-tile .aname{
+    position:absolute; left:0; right:0; bottom:0; z-index:2; padding:14px 8px 6px;
+    background:linear-gradient(transparent, rgba(0,0,0,.55)); color:#fff;
+    font-size:11px; font-weight:700; border-radius:0 0 14px 14px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .wtile .placeholder-cover{
+    width:100%; height:100%; border-radius:14px; display:flex; align-items:center; justify-content:center;
+    font-size:26px; background:linear-gradient(135deg, var(--rust), var(--moss)); position:relative; z-index:1;
+  }
+  .wall-ghost{
+    position:fixed; z-index:999; pointer-events:none; width:90px; height:90px;
+    border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.35); opacity:.92; transform:translate(-50%,-50%) scale(1.05);
+  }
+  .wall-ghost img{ width:100%; height:100%; object-fit:cover; }
+  .album-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .album-row:last-child{ border-bottom:none; }
+  .album-row img, .album-row .placeholder-cover{ width:44px; height:44px; border-radius:10px; object-fit:cover; flex-shrink:0; font-size:18px; }
+  .album-row .info{ flex:1; min-width:0; }
+  .album-row .info .t{ font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .album-row .info .c{ font-size:11px; color:var(--muted); }
+  .album-row button{ width:auto; padding:6px 10px; font-size:11.5px; }
   .empty{ font-size:12px; color:var(--muted); text-align:center; padding:20px 0; }
   .spinner{ font-size:12px; color:var(--muted); text-align:center; padding:10px 0; }
 
@@ -321,12 +366,25 @@
         </label>
         <label>圖說（選填，套用到這批全部照片）</label>
         <input type="text" id="photoCaption" placeholder="這批照片的說明">
+        <label>上傳到（選填）</label>
+        <select id="photoAlbumSelect"><option value="">牆上零散照片</option></select>
         <button class="btn btn-primary btn-block" id="uploadBtn">確認上傳</button>
         <div id="uploadProgress" style="display:none; margin-top:10px; font-size:12px; line-height:1.9; color:var(--muted); word-break:break-all;"></div>
       </div>
+
       <div class="card">
-        <h2>目前照片</h2>
-        <div id="photoList"><div class="empty">尚無照片</div></div>
+        <h2>相簿</h2>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input type="text" id="newAlbumName" placeholder="新相簿名稱" style="flex:1; margin:0;">
+          <button class="btn btn-primary" id="createAlbumBtn" style="width:auto; padding:0 16px;">建立</button>
+        </div>
+        <div id="albumList"><div class="empty">尚無相簿</div></div>
+      </div>
+
+      <div class="card">
+        <h2>照片牆排列</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">這裡的排列就是前台照片牆的樣子。長按（手機）或按住（滑鼠）拖動可調整順序；把照片拖到相簿方塊上放開，就會收進該相簿。點相簿方塊可展開管理裡面的照片。</p>
+        <div id="wallEditor" class="wall-editor"><div class="empty">載入中…</div></div>
       </div>
     </div>
 
@@ -461,7 +519,7 @@
     getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, getDocs, setDoc, collection, addDoc, deleteDoc, onSnapshot,
+    getFirestore, doc, getDoc, getDocs, setDoc, collection, addDoc, deleteDoc, onSnapshot, writeBatch,
     query, orderBy, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
   import {
@@ -612,9 +670,26 @@
       return canvas;
     };
 
-    // 原生解碼
+    // 原生解碼；大圖用 resize 選項先在解碼階段縮小，避免一億像素照片吃爆記憶體
     try{
-      const bmp = await createImageBitmap(file);
+      let bmp;
+      try{
+        const probe = await createImageBitmap(file);
+        const longest = Math.max(probe.width, probe.height);
+        if(longest > MAX){
+          const scale = MAX / longest;
+          bmp = await createImageBitmap(file, {
+            resizeWidth: Math.round(probe.width * scale),
+            resizeHeight: Math.round(probe.height * scale),
+            resizeQuality: 'high'
+          });
+          probe.close();
+        }else{
+          bmp = probe;
+        }
+      }catch(inner){
+        bmp = await createImageBitmap(file); // 不支援 resize 選項的瀏覽器退回一般解碼
+      }
       const c = drawScaled(bmp.width, bmp.height, (ctx, w, h)=> ctx.drawImage(bmp, 0, 0, w, h));
       bmp.close();
       return c;
@@ -755,29 +830,233 @@
   }
 
   // ---------- 照片牆 ----------
-  function initGallery(){
+  async function initGallery(){
     const colRef = collection(db, 'gallery');
-    const q = query(colRef, orderBy('uploadedAt', 'desc'));
-    onSnapshot(q, (snap)=>{
-      const list = document.getElementById('photoList');
-      if(snap.empty){ list.innerHTML = '<div class="empty">尚無照片</div>'; return; }
+    const albumsRef = collection(db, 'albums');
+    const { default: Sortable } = await import('https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/+esm');
+
+    let photos = [], albums = [];
+    let openAlbumId = null;   // null=主牆；有值=展開該相簿
+    let draggingNow = false;
+    let pendingRender = false;
+    const sortables = [];
+
+    // 排序鍵：有手動 order 用 order；舊資料沒有就用 -上傳時間（新的在前，跟原本一致）
+    function effOrder(x){
+      if(typeof x.order === 'number') return x.order;
+      const t = x.uploadedAt && x.uploadedAt.toMillis ? x.uploadedAt.toMillis() : 0;
+      return -t;
+    }
+    const bySort = (a,b)=> effOrder(a) - effOrder(b);
+
+    function albumPhotos(id){ return photos.filter(p=> p.albumId === id).sort(bySort); }
+    function albumCover(al){
+      const inAlbum = albumPhotos(al.id);
+      return photos.find(p=> p.id === al.coverPhotoId) || inAlbum[0] || null;
+    }
+
+    // ---------- 相簿清單卡片 ----------
+    function renderAlbumList(){
+      const list = document.getElementById('albumList');
+      const sel = document.getElementById('photoAlbumSelect');
+      const kept = sel.value;
+      sel.innerHTML = '<option value="">牆上零散照片</option>' +
+        albums.slice().sort(bySort).map(a=> `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+      sel.value = kept && albums.some(a=> a.id === kept) ? kept : '';
+      if(!albums.length){ list.innerHTML = '<div class="empty">尚無相簿</div>'; return; }
       list.innerHTML = '';
-      snap.forEach(d=>{
-        const p = d.data();
-        const el = document.createElement('div');
-        el.className = 'photo-item';
-        el.innerHTML = `
-          <img src="${p.imageUrl}" alt="">
-          <div class="cap">${escapeHtml(p.caption || '（無說明）')}</div>
-          <button class="del-btn">✕</button>
+      albums.slice().sort(bySort).forEach(al=>{
+        const cover = albumCover(al);
+        const row = document.createElement('div');
+        row.className = 'album-row';
+        row.innerHTML = `
+          ${cover ? `<img src="${cover.imageUrl}" alt="">` : `<div class="placeholder-cover">📁</div>`}
+          <div class="info">
+            <div class="t">${escapeHtml(al.name)}</div>
+            <div class="c">${albumPhotos(al.id).length} 張</div>
+          </div>
+          <button class="btn" data-act="rename">改名</button>
+          <button class="btn" data-act="del" style="color:#e53935;">刪除</button>
         `;
-        el.querySelector('.del-btn').addEventListener('click', async ()=>{
-          try{ if(p.storagePath) await deleteObject(ref(storage, p.storagePath)); }catch(e){}
-          try{ if(p.originalPath) await deleteObject(ref(storage, p.originalPath)); }catch(e){}
-          await deleteDoc(doc(db,'gallery', d.id));
-        });
-        list.appendChild(el);
+        row.querySelector('[data-act="rename"]').onclick = async ()=>{
+          const name = prompt('相簿名稱', al.name);
+          if(name && name.trim()) await setDoc(doc(db,'albums', al.id), { name: name.trim() }, { merge:true });
+        };
+        row.querySelector('[data-act="del"]').onclick = async ()=>{
+          if(!confirm(`刪除相簿「${al.name}」？裡面的照片會回到牆上，不會被刪除。`)) return;
+          const batch = writeBatch(db);
+          albumPhotos(al.id).forEach(p=> batch.set(doc(db,'gallery', p.id), { albumId: null }, { merge:true }));
+          batch.delete(doc(db,'albums', al.id));
+          await batch.commit();
+          if(openAlbumId === al.id) openAlbumId = null;
+        };
+        list.appendChild(row);
       });
+    }
+
+    document.getElementById('createAlbumBtn').onclick = async ()=>{
+      const input = document.getElementById('newAlbumName');
+      const name = input.value.trim();
+      if(!name) return;
+      await addDoc(albumsRef, { name, coverPhotoId: null, order: -Date.now(), createdAt: serverTimestamp() });
+      input.value = '';
+    };
+
+    // ---------- 照片牆排列編輯器 ----------
+    function makePhotoTile(p, inAlbum){
+      const el = document.createElement('div');
+      el.className = 'wtile';
+      el.dataset.kind = 'photo';
+      el.dataset.id = p.id;
+      el.innerHTML = `
+        <img src="${p.imageUrl}" alt="">
+        <button class="wdel" title="刪除照片">✕</button>
+        ${inAlbum ? `
+          <button class="wdel" style="right:auto; left:6px;" data-act="out" title="移回主牆">⬆</button>
+          <button class="wdel" style="right:auto; left:50%; margin-left:-12px;" data-act="cover" title="設為封面">☆</button>
+        ` : ''}
+      `;
+      el.querySelector('.wdel:not([data-act])').onclick = async (e)=>{
+        e.stopPropagation();
+        if(!confirm('刪除這張照片？（含原始檔，無法復原）')) return;
+        try{ if(p.storagePath) await deleteObject(ref(storage, p.storagePath)); }catch(err){}
+        try{ if(p.originalPath) await deleteObject(ref(storage, p.originalPath)); }catch(err){}
+        await deleteDoc(doc(db,'gallery', p.id));
+      };
+      if(inAlbum){
+        el.querySelector('[data-act="out"]').onclick = async (e)=>{
+          e.stopPropagation();
+          await setDoc(doc(db,'gallery', p.id), { albumId: null, order: -Date.now() }, { merge:true });
+        };
+        el.querySelector('[data-act="cover"]').onclick = async (e)=>{
+          e.stopPropagation();
+          await setDoc(doc(db,'albums', openAlbumId), { coverPhotoId: p.id }, { merge:true });
+        };
+      }
+      return el;
+    }
+
+    function makeAlbumTile(al){
+      const el = document.createElement('div');
+      el.className = 'wtile album-tile';
+      el.dataset.kind = 'album';
+      el.dataset.id = al.id;
+      const cover = albumCover(al);
+      el.innerHTML = `
+        <div class="astack"></div>
+        ${cover ? `<img src="${cover.imageUrl}" alt="">` : `<div class="placeholder-cover">📁</div>`}
+        <div class="aname">${escapeHtml(al.name)}（${albumPhotos(al.id).length}）</div>
+      `;
+      el.addEventListener('click', ()=>{ openAlbumId = al.id; renderWall(); });
+      return el;
+    }
+
+    function destroySortables(){ while(sortables.length){ try{ sortables.pop().destroy(); }catch(err){} } }
+
+    async function persistOrder(container){
+      // 依 DOM 目前順序，整批重寫 order（每格間隔 10）
+      const batch = writeBatch(db);
+      [...container.children].forEach((el, i)=>{
+        if(!el.dataset || !el.dataset.id) return;
+        const coll = el.dataset.kind === 'album' ? 'albums' : 'gallery';
+        batch.set(doc(db, coll, el.dataset.id), { order: i * 10 }, { merge:true });
+      });
+      await batch.commit();
+    }
+
+    function renderWall(){
+      if(draggingNow){ pendingRender = true; return; }
+      destroySortables();
+      const wall = document.getElementById('wallEditor');
+      wall.innerHTML = '';
+
+      if(openAlbumId !== null){
+        const al = albums.find(a=> a.id === openAlbumId);
+        if(!al){ openAlbumId = null; renderWall(); return; }
+        const head = document.createElement('div');
+        head.style.cssText = 'grid-column:1/-1; display:flex; align-items:center; gap:10px; padding-bottom:4px; flex-wrap:wrap;';
+        head.innerHTML = `<button class="btn" id="albumBackBtn" style="width:auto; padding:6px 12px;">← 回主牆</button><b style="font-size:13.5px;">${escapeHtml(al.name)}</b><span style="font-size:11px; color:var(--muted);">☆ 設封面　⬆ 移回主牆</span>`;
+        wall.appendChild(head);
+        head.querySelector('#albumBackBtn').onclick = ()=>{ openAlbumId = null; renderWall(); };
+
+        const items = albumPhotos(openAlbumId);
+        if(!items.length){
+          const empty = document.createElement('div');
+          empty.className = 'empty'; empty.style.gridColumn = '1/-1';
+          empty.textContent = '這個相簿還沒有照片：把主牆的照片拖到相簿方塊上放開，或上傳時直接選這個相簿';
+          wall.appendChild(empty);
+          return;
+        }
+        items.forEach(p=> wall.appendChild(makePhotoTile(p, true)));
+        sortables.push(new Sortable(wall, {
+          animation:150, delay:200, delayOnTouchOnly:true, draggable:'.wtile',
+          ghostClass:'dragging',
+          onStart:()=>{ draggingNow = true; },
+          onEnd: async ()=>{
+            draggingNow = false;
+            await persistAlbumOrder(wall);
+            if(pendingRender){ pendingRender = false; renderWall(); }
+          }
+        }));
+        return;
+      }
+
+      // 主牆：零散照片 + 相簿方塊混排
+      const merged = [
+        ...photos.filter(p=> !p.albumId).map(p=> ({ kind:'photo', it:p })),
+        ...albums.map(a=> ({ kind:'album', it:a }))
+      ].sort((a,b)=> effOrder(a.it) - effOrder(b.it));
+
+      if(!merged.length){ wall.innerHTML = '<div class="empty">還沒有照片</div>'; return; }
+      merged.forEach(m=> wall.appendChild(m.kind === 'album' ? makeAlbumTile(m.it) : makePhotoTile(m.it, false)));
+
+      sortables.push(new Sortable(wall, {
+        animation:150, delay:200, delayOnTouchOnly:true, draggable:'.wtile',
+        ghostClass:'dragging',
+        onStart:()=>{ draggingNow = true; },
+        onMove:(evt)=>{
+          wall.querySelectorAll('.drop-target').forEach(x=> x.classList.remove('drop-target'));
+          if(evt.dragged.dataset.kind === 'photo' && evt.related && evt.related.dataset && evt.related.dataset.kind === 'album' && evt.willInsertAfter === false){
+            evt.related.classList.add('drop-target');
+          }
+          return true;
+        },
+        onEnd: async (evt)=>{
+          draggingNow = false;
+          const target = wall.querySelector('.drop-target');
+          wall.querySelectorAll('.drop-target').forEach(x=> x.classList.remove('drop-target'));
+          if(target && evt.item.dataset.kind === 'photo'){
+            await setDoc(doc(db,'gallery', evt.item.dataset.id), { albumId: target.dataset.id, order: -Date.now() }, { merge:true });
+          }else{
+            await persistOrder(wall);
+          }
+          if(pendingRender){ pendingRender = false; renderWall(); }
+        }
+      }));
+    }
+
+    // 相簿內排序：略過表頭列再寫 order
+    async function persistAlbumOrder(wall){
+      const batch = writeBatch(db);
+      let i = 0;
+      [...wall.children].forEach(el=>{
+        if(!el.dataset || !el.dataset.id) return;
+        batch.set(doc(db,'gallery', el.dataset.id), { order: (i++) * 10 }, { merge:true });
+      });
+      await batch.commit();
+    }
+
+    onSnapshot(query(colRef, orderBy('uploadedAt', 'desc')), (snap)=>{
+      photos = [];
+      snap.forEach(d=> photos.push({ id:d.id, ...d.data() }));
+      renderAlbumList();
+      renderWall();
+    });
+    onSnapshot(albumsRef, (snap)=>{
+      albums = [];
+      snap.forEach(d=> albums.push({ id:d.id, ...d.data() }));
+      renderAlbumList();
+      renderWall();
     });
 
     let selectedFiles = [];
@@ -815,6 +1094,7 @@
       if(!selectedFiles.length) return;
       const files = selectedFiles;
       const caption = document.getElementById('photoCaption').value.trim();
+      const uploadAlbumId = document.getElementById('photoAlbumSelect').value || null;
       // 立刻釋放選擇器，可馬上選下一批
       selectedFiles = [];
       photoInput.value = '';
@@ -869,6 +1149,8 @@
             originalPath: origPath,
             originalName: file.name,
             caption,
+            albumId: uploadAlbumId,
+            order: -Date.now(),
             uploadedAt: serverTimestamp()
           });
           lines[i] = `✅ ${file.name}：完成`; renderProgress();
