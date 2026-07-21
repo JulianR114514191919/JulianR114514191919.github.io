@@ -168,20 +168,19 @@
   }
   .wtile img{ width:100%; height:auto; display:block; border-radius:16px; pointer-events:none; }
   .wtile.lifted{
-    transform:scale(1.05); z-index:5;
+    z-index:5; cursor:grabbing;
     box-shadow:0 12px 30px rgba(0,0,0,.35);
-    cursor:grabbing;
+    outline:2px solid var(--rust); outline-offset:-2px;
   }
   .wtile.dragging{ opacity:.35; }
-  .wtile.drop-target{ transform:scale(1.04); }
   .wtile.drop-target::after{
-    content:''; position:absolute; inset:-3px; border:2.5px solid var(--rust); border-radius:18px; pointer-events:none;
+    content:''; position:absolute; inset:-4px; border:3px solid var(--rust); border-radius:18px; pointer-events:none;
+    box-shadow:0 0 0 4px rgba(139,79,217,.18);
   }
   .sortable-fallback{
-    pointer-events:none; opacity:.92 !important; z-index:999;
+    opacity:.95 !important; z-index:999;
     border-radius:16px; overflow:hidden;
     box-shadow:0 14px 34px rgba(0,0,0,.4);
-    transform:scale(1.05);
   }
   .wtile .wdel{
     position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
