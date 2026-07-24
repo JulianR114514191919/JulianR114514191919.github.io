@@ -370,7 +370,7 @@
         <h2>上傳照片</h2>
         <label class="upload-zone" id="uploadZone">
           <span id="uploadZoneText">📷 點擊選擇照片（可一次選多張，或直接拖曳檔案到這裡）</span>
-          <input type="file" id="photoInput" accept="image/*,.jxl,.tif,.tiff" multiple>
+          <input type="file" id="photoInput" accept="image/*,.tif,.tiff" multiple>
         </label>
         <label>圖說（選填，套用到這批全部照片）</label>
         <input type="text" id="photoCaption" placeholder="這批照片的說明">
@@ -486,6 +486,13 @@
       </div>
 
       <div class="card">
+        <h2>原始檔搬移到 R2</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">把還留在 Firebase 的照片原始檔搬去 Cloudflare R2（縮圖不動）。每張都先複製、核對成功後才刪 Firebase 那份，中途停下也不會遺失檔案。每月 1 號清晨會自動跑一次，這顆是給第一次大搬家或想立刻清出空間時用的。</p>
+        <button class="btn btn-primary btn-block" id="migrateBtn">開始搬移</button>
+        <div class="spinner" id="migrateStatus" style="display:none;"></div>
+      </div>
+
+      <div class="card">
         <h2>網站配色</h2>
         <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">選 3 個顏色，網站會自動根據這 3 色算出整套配色（文字、邊框、毛玻璃、背景漸層），類似 Android Material You 的概念。</p>
 
@@ -533,6 +540,9 @@
   import {
     getStorage, ref, uploadBytes, getDownloadURL, deleteObject, updateMetadata
   } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
+  import {
+    getFunctions, httpsCallable
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAfyM4g54lnJh3mQhJ3zU50U75mB_04MHk",
@@ -551,6 +561,15 @@
   const db = getFirestore(app);
   const storage = getStorage(app);
   const provider = new GoogleAuthProvider();
+
+  // 雲端函式（asia-east1 = 台灣機房）。原始檔改存 Cloudflare R2 之後，
+  // 跟 R2 的所有往來（拿上傳網址、刪檔、搬移）都經過這幾支後端函式，
+  // R2 的金鑰只存在後端，這個頁面永遠拿不到。
+  const fns = getFunctions(app, 'asia-east1');
+  const r2UploadTicket = httpsCallable(fns, 'r2UploadTicket');
+  const r2Delete = httpsCallable(fns, 'r2Delete');
+  // 搬移一批要跑比較久，逾時放寬到 9 分鐘（跟後端函式的上限一致）
+  const migrateOriginalsNow = httpsCallable(fns, 'migrateOriginalsNow', { timeout: 540000 });
 
   // 檔名帶時間戳記、內容不變，可放心快取一年
   const IMG_CACHE_META = { cacheControl: 'public, max-age=31536000, immutable' };
@@ -666,7 +685,8 @@
     };
   }
 
-  // 圖檔轉 WebP 縮圖（照片牆 1600 / 頭貼 512）。原生解碼失敗才載入 TIFF、JXL 解碼器；全失敗回 null 不發布
+  // 圖檔轉 WebP 縮圖（照片牆 1600 / 頭貼 512）。原生解碼失敗才載入 TIFF 解碼器；全失敗回 null 不發布
+  // （JPEG XL 支援已移除——手機 App 讀不了這個格式，兩邊統一不收）
   async function decodeToCanvas(file, maxSize){
     const MAX = maxSize;
     const drawScaled = (srcW, srcH, drawFn)=>{
@@ -723,15 +743,6 @@
         const rgba = UTIF.toRGBA8(ifds[0]);
         return fromImageData(new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height));
       }catch(err){ console.warn('TIFF 解碼失敗', err); }
-    }
-
-    // JPEG XL
-    if(file.type === 'image/jxl' || /\.jxl$/.test(name)){
-      try{
-        const { decode } = await import('https://cdn.jsdelivr.net/npm/@jsquash/jxl@1/+esm');
-        const imageData = await decode(await file.arrayBuffer());
-        return fromImageData(imageData);
-      }catch(err){ console.warn('JPEG XL 解碼失敗', err); }
     }
 
     return null;
@@ -928,7 +939,13 @@
         e.stopPropagation();
         if(!confirm('刪除這張照片？（含原始檔，無法復原）')) return;
         try{ if(p.storagePath) await deleteObject(ref(storage, p.storagePath)); }catch(err){}
-        try{ if(p.originalPath) await deleteObject(ref(storage, p.originalPath)); }catch(err){}
+        // 原檔可能在 R2（新流程）或還在 Firebase（未搬移的舊資料），去對的地方刪
+        try{
+          if(p.originalPath){
+            if(p.originalStore === 'r2') await r2Delete({ key: p.originalPath });
+            else await deleteObject(ref(storage, p.originalPath));
+          }
+        }catch(err){}
         await deleteDoc(doc(db,'gallery', p.id));
       };
       if(inAlbum){
@@ -1120,7 +1137,7 @@
       e.preventDefault();
       dropZone.classList.remove('dragover');
       const dropped = [...(e.dataTransfer.files || [])].filter(f=>
-        f.type.startsWith('image/') || /\.(jxl|tiff?)$/i.test(f.name)
+        f.type.startsWith('image/') || /\.tiff?$/i.test(f.name)
       );
       if(!dropped.length) return;
       selectedFiles = dropped;
@@ -1143,32 +1160,37 @@
       const renderProgress = ()=> progressEl.innerHTML = lines.map(l=> escapeHtml(l)).join('<br>');
       renderProgress();
 
-      // 上傳原檔與轉檔同時進行，一次跑 3 張
+      // 上傳原檔與轉檔同時進行，一次跑 3 張。
+      // 原始檔直接進 Cloudflare R2：先跟後端要一張短效上傳通行證（預簽名網址），
+      // 再拿著它把檔案直接送進 R2，不經過 Google 也碰不到金鑰。
+      // 縮圖照舊放 Firebase Storage —— 小而常讀留 Firebase、大而少讀去 R2。
       const CONCURRENCY = 3;
       async function processOne(i){
         const file = files[i];
-        let step = '上傳原始檔＋轉檔';
-        const ts = Date.now() + i; // 防同毫秒撞檔名
-        const origPath = `gallery/orig/${ts}_${file.name}`;
-        const origRef = ref(storage, origPath);
+        let step = '取得上傳許可';
+        const ts = Date.now() + i; // 防同毫秒撞檔名（縮圖檔名用；原檔檔名由後端配發）
         try{
+          lines[i] = `🔄 ${file.name}：準備上傳…`; renderProgress();
+          const ticket = (await r2UploadTicket({
+            fileName: file.name,
+            contentType: file.type || 'application/octet-stream'
+          })).data;
+
+          step = '上傳原始檔＋轉檔';
           lines[i] = `🔄 ${file.name}：上傳原始檔＋轉 WebP 中…`; renderProgress();
-          const [, thumb] = await Promise.all([
-            uploadBytes(origRef, file, {
-              ...IMG_CACHE_META,
-              // 附件標頭：前台點下載直接存檔
-              contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`
-            }),
+          const [putRes, thumb] = await Promise.all([
+            // 附件與快取標頭由通行證一起帶回，要原樣送出
+            fetch(ticket.uploadUrl, { method: 'PUT', body: file, headers: ticket.headers }),
             makeWebpThumb(file, 1600)
           ]);
+          if(!putRes.ok) throw new Error(`R2 回應 ${putRes.status}`);
           if(!thumb){
-            // 轉不出縮圖就不發布，並清掉已上傳的原檔
-            try{ await deleteObject(origRef); }catch(e){}
+            // 轉不出縮圖就不發布，並清掉已上傳到 R2 的原檔
+            try{ await r2Delete({ key: ticket.key }); }catch(e){}
             lines[i] = `❌ ${file.name}：無法解碼這個格式，未發布（請確認檔案沒壞，或回報我加上這個格式的支援）`;
             renderProgress();
             return;
           }
-          const origUrl = await getDownloadURL(origRef);
 
           step = '上傳縮圖';
           lines[i] = `🔄 ${file.name}：上傳縮圖中…`; renderProgress();
@@ -1180,10 +1202,11 @@
           step = '寫入資料庫';
           lines[i] = `🔄 ${file.name}：寫入資料庫中…`; renderProgress();
           await addDoc(colRef, {
-            imageUrl: thumbUrl,        // 顯示用縮圖
+            imageUrl: thumbUrl,           // 顯示用縮圖（Firebase）
             storagePath: thumbPath,
-            originalUrl: origUrl,      // 下載用原檔
-            originalPath: origPath,
+            originalUrl: ticket.publicUrl, // 下載用原檔（R2 公開網址）
+            originalPath: ticket.key,      // R2 上的物件路徑
+            originalStore: 'r2',           // 原檔存放處。沒有這欄位 = 還在 Firebase 的舊資料
             originalName: file.name,
             caption,
             albumId: uploadAlbumId,
@@ -1437,7 +1460,9 @@
           const p = data.storagePath || pathFromDownloadUrl(data.imageUrl);
           if(p) paths.add(p);
           const op = data.originalPath || '';
-          if(op) origPaths.add(op);
+          // R2 上的原檔跳過：標頭在上傳當下就寫在 R2 物件上了，
+          // 這裡的 updateMetadata 是 Firebase 的功能，碰不到別家服務
+          if(op && data.originalStore !== 'r2') origPaths.add(op);
         });
       }
       const eggSnap = await getDoc(doc(db, 'settings', 'easterEgg'));
@@ -1470,6 +1495,42 @@
       status.textContent = failed
         ? `完成：成功 ${done} 個，失敗 ${failed} 個（詳見瀏覽器 console）`
         : `完成！已修復 ${done} 個檔案 ✓`;
+      btn.disabled = false;
+    };
+
+    // 手動把還留在 Firebase 的原始檔搬去 R2。
+    // 一次搬 5 張、搬完一批接著下一批，直到全部搬完；中斷了再按一次就會續搬。
+    document.getElementById('migrateBtn').onclick = async ()=>{
+      if(!confirm('開始把原始檔搬移到 R2？\n每張都會先複製、核對成功後才刪 Firebase 上那份，中途停下不會遺失檔案。')) return;
+      const btn = document.getElementById('migrateBtn');
+      const status = document.getElementById('migrateStatus');
+      btn.disabled = true;
+      status.style.display = 'block';
+      let movedTotal = 0;
+      try{
+        while(true){
+          status.textContent = `搬移中…（已完成 ${movedTotal} 張）`;
+          const r = (await migrateOriginalsNow({ limit: 5 })).data;
+          movedTotal += r.moved;
+          if(r.failed){
+            status.textContent = `搬了 ${movedTotal} 張後遇到錯誤：${(r.errors || []).join('；') || '未知錯誤'}（可再按一次重試）`;
+            btn.disabled = false;
+            return;
+          }
+          if(r.remaining <= 0) break;
+          if(r.moved === 0){
+            // 沒有進展就先停，避免無限迴圈（理論上不會發生）
+            status.textContent = `已搬 ${movedTotal} 張，剩 ${r.remaining} 張沒動靜，先停下（可再按一次重試）`;
+            btn.disabled = false;
+            return;
+          }
+        }
+        status.textContent = movedTotal
+          ? `完成！共搬移 ${movedTotal} 張原始檔到 R2 ✓`
+          : '沒有需要搬移的檔案（原始檔都已經在 R2 上）✓';
+      }catch(err){
+        status.textContent = `搬移中斷：${(err && err.message) || err}（已搬 ${movedTotal} 張，再按一次可續搬）`;
+      }
       btn.disabled = false;
     };
   }
