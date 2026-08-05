@@ -1,0 +1,2639 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>帝國後台 · Julian</title>
+<!--
+  後台維持 Inter（2026-07-31 決定）。田氏方筆刷體繁**只套在入口網站**——
+  後台是自己每天在用的工作介面，毛筆字漂亮但長時間看字表格會累，
+  而且那個字型有約 3.6% 的字畫不出來、會退回系統字，管理介面上看起來很雜。
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#3A2E22; --muted:#8C7A63; --rust:#B85C34; --moss:#6E7A52;
+    --line: rgba(255,255,255,0.45);
+    --glass: rgba(255,251,242,0.55);
+    --glass-strong: rgba(255,251,242,0.75);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --danger:#B8453D;
+    --bg-radial-1: #E8B98A; --bg-radial-2: #C97A55; --bg-radial-3: #8A9668; --bg-radial-4: #D9A05B;
+    --bg-base: #EFE4D2;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ min-height:100%; }
+  body{
+    font-family:'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing:antialiased;
+    min-height:100dvh;
+    background:
+      radial-gradient(circle at 20% 20%, var(--bg-radial-1) 0%, transparent 45%),
+      radial-gradient(circle at 85% 15%, var(--bg-radial-2) 0%, transparent 40%),
+      radial-gradient(circle at 75% 85%, var(--bg-radial-3) 0%, transparent 45%),
+      radial-gradient(circle at 10% 90%, var(--bg-radial-4) 0%, transparent 40%),
+      var(--bg-base);
+    background-attachment: fixed;
+    padding: 28px 16px 60px;
+  }
+  .wrap{ max-width: 480px; margin: 0 auto; }
+
+  /* ---- 登入畫面 ---- */
+  #loginView{
+    min-height: 80dvh; display:flex; align-items:center; justify-content:center;
+  }
+  .login-card{
+    width:100%; max-width:360px; text-align:center;
+    background: var(--glass); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border:1px solid var(--line); border-radius:30px; padding:44px 30px;
+    box-shadow: 0 20px 50px -20px rgba(58,46,34,0.28);
+  }
+  .login-card h1{ font-size:22px; font-weight:800; margin-bottom:6px; letter-spacing:-0.01em; }
+  .login-card p{ font-size:13px; color:var(--muted); margin-bottom:28px; }
+  .google-btn{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; padding:13px; border-radius:14px; border:1px solid var(--line);
+    background: var(--glass-strong); color:var(--ink); font-weight:700; font-size:14px;
+    cursor:pointer; transition: transform .15s var(--ease);
+  }
+  .google-btn:active{ transform: scale(.97); }
+  .login-error{ margin-top:16px; font-size:12px; color:var(--danger); font-weight:600; display:none; }
+
+  /* ---- 主畫面 ---- */
+  #appView{ display:none; }
+  header.top{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;
+  }
+  header.top .who{ display:flex; align-items:center; gap:10px; }
+  header.top img{ width:34px; height:34px; border-radius:50%; }
+  header.top .name{ font-size:13.5px; font-weight:700; }
+  .logout-btn{
+    font-size:12px; font-weight:700; color:var(--muted); background:none; border:none; cursor:pointer;
+    text-decoration:underline;
+  }
+
+  .tabs{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .tab{
+    flex:1 1 30%; text-align:center; padding:10px 8px; border-radius:14px; font-size:12px; font-weight:700;
+    background: var(--glass); border:1px solid var(--line); cursor:pointer; color:var(--muted);
+    transition: all .2s var(--ease);
+  }
+  .tab.active{ background: var(--ink); color:#F6EEDF; border-color:var(--ink); }
+
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  .card{
+    background: var(--glass); backdrop-filter: blur(26px) saturate(170%); -webkit-backdrop-filter: blur(26px) saturate(170%);
+    border:1px solid var(--line); border-radius:24px; padding:22px 20px; margin-bottom:16px;
+    box-shadow: 0 12px 30px -16px rgba(58,46,34,0.22);
+  }
+  .card h2{ font-size:15px; font-weight:800; margin-bottom:14px; }
+
+  /* ---- 雲端流量計 ---- */
+  .card h2.with-action{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .mini-btn{
+    font-size:11px; font-weight:700; color:var(--muted); background:var(--glass-strong);
+    border:1px solid var(--line); border-radius:10px; padding:5px 10px; cursor:pointer;
+    transition: transform .15s var(--ease), opacity .2s ease;
+  }
+  .mini-btn:active{ transform: scale(.94); }
+  .mini-btn:disabled{ opacity:.5; cursor:default; }
+  /* 大字報：整個面板最重要的一句話就是「還能放幾張」 */
+  .usage-hero{
+    text-align:center; padding:16px 12px 18px; border-radius:18px; margin-bottom:16px;
+    background: var(--glass-strong); border:1px solid var(--line);
+  }
+  .usage-hero .lbl{ font-size:11.5px; font-weight:700; color:var(--muted); }
+  .usage-hero .big{ font-size:40px; font-weight:800; letter-spacing:-0.03em; line-height:1.12; }
+  .usage-hero .big small{ font-size:17px; font-weight:700; margin-left:3px; }
+  .usage-hero .why{ font-size:11.5px; color:var(--muted); margin-top:5px; line-height:1.55; }
+  .usage-sec{
+    font-size:11px; font-weight:800; color:var(--muted); letter-spacing:.06em;
+    margin:18px 0 9px; padding-bottom:6px; border-bottom:1px solid var(--line);
+  }
+  .usage-sec:first-of-type{ margin-top:0; }
+  .meter{ margin-bottom:11px; }
+  .meter .top{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:12px; }
+  .meter .top b{ font-weight:700; }
+  .meter .top span{ font-size:11.5px; color:var(--muted); font-variant-numeric: tabular-nums; }
+  .meter .bar{
+    height:6px; border-radius:99px; margin-top:5px; overflow:hidden;
+    background: rgba(58,46,34,0.10);
+  }
+  .meter .fill{
+    height:100%; border-radius:99px; background: var(--moss);
+    transition: width .6s var(--ease), background-color .3s ease;
+  }
+  .meter.warn .fill{ background: var(--rust); }
+  .meter.over .fill{ background: var(--danger); }
+  .meter.warn .top span, .meter.over .top span{ color:var(--ink); font-weight:700; }
+  /* 空間明細：縮排的小清單 */
+  .usage-parts{ margin:-4px 0 12px; padding-left:2px; }
+  .usage-parts div{
+    display:flex; justify-content:space-between; gap:8px;
+    font-size:11.5px; color:var(--muted); padding:2.5px 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .usage-parts div.soft{ color:var(--rust); font-weight:600; }
+  /* 費用明細：項目｜狀態｜金額 三欄 */
+  .usage-bill div{
+    display:flex; align-items:baseline; gap:8px; font-size:12px;
+    padding:4px 0; font-variant-numeric: tabular-nums;
+  }
+  .usage-bill div span{ flex:1; min-width:0; }
+  .usage-bill div i{ font-style:normal; font-size:11px; color:var(--muted); }
+  .usage-bill div b{ min-width:62px; text-align:right; font-weight:700; color:var(--muted); }
+  /* 已經在收錢的用紅色；只是「月底才會超」的用橘色，兩者不該長一樣 */
+  .usage-bill div.charged{ color:var(--ink); }
+  .usage-bill div.charged i{ color:var(--danger); font-weight:700; }
+  .usage-bill div.charged b{ color:var(--danger); }
+  .usage-bill div.willcharge{ color:var(--ink); }
+  .usage-bill div.willcharge i{ color:var(--rust); font-weight:700; }
+  .usage-total{
+    margin-top:10px; padding-top:11px; border-top:1px solid var(--line);
+  }
+  .usage-total div{
+    display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+    font-size:13px; font-weight:700; padding:3px 0; font-variant-numeric: tabular-nums;
+  }
+  .usage-total div.proj{ font-size:12px; font-weight:600; color:var(--muted); }
+  .usage-total .twd{ display:block; text-align:right; font-size:11px; color:var(--muted); font-weight:600; }
+  .usage-total.charged div:first-child{ color:var(--danger); }
+  .usage-note{
+    font-size:11px; color:var(--muted); line-height:1.65; margin-top:16px;
+    padding-top:12px; border-top:1px solid var(--line);
+  }
+  .usage-free{ font-size:12px; font-weight:700; color:var(--moss); }
+
+  textarea, input[type="text"], input[type="date"]{
+    width:100%; font-family:inherit; font-size:13.5px; color:var(--ink);
+    background: var(--glass-strong); border:1px solid var(--line); border-radius:14px;
+    padding:12px 14px; resize:vertical;
+  }
+  textarea{ min-height:160px; line-height:1.7; }
+  label{ display:block; font-size:11.5px; font-weight:700; color:var(--muted); margin:12px 0 6px; }
+  label:first-child{ margin-top:0; }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:11px 18px; border-radius:14px; border:none; font-weight:700; font-size:13px;
+    cursor:pointer; transition: transform .15s var(--ease), opacity .15s ease;
+  }
+  .btn:active{ transform: scale(.96); }
+  .btn-primary{ background: var(--ink); color:#F6EEDF; }
+  .btn-danger{ background: rgba(184,69,61,0.12); color: var(--danger); }
+  .btn-block{ width:100%; margin-top:14px; }
+  .save-status{ font-size:11.5px; color:var(--moss); font-weight:700; margin-left:10px; opacity:0; transition: opacity .3s ease; }
+  .save-status.show{ opacity:1; }
+
+  .event-item{
+    display:flex; align-items:center; gap:12px; padding:12px; border-radius:16px;
+    background: var(--glass-strong); border:1px solid var(--line); margin-bottom:10px;
+  }
+  .event-item .info{ flex:1; min-width:0; }
+  .event-item .ttl{ font-size:13px; font-weight:700; }
+  .event-item .dt{ font-size:11px; color:var(--muted); font-weight:600; }
+  .event-item .desc{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .del-btn{
+    width:30px; height:30px; border-radius:50%; border:none; background: rgba(184,69,61,0.12); color:var(--danger);
+    font-size:14px; cursor:pointer; flex-shrink:0;
+  }
+
+  .avatar-item{
+    display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:16px;
+    background: var(--glass-strong); border:1px solid var(--line); margin-bottom:10px;
+  }
+  .avatar-item img{ width:48px; height:48px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+  .avatar-item .ai-info{ flex:1; min-width:0; }
+  .avatar-item .ai-artist{ font-size:12.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .avatar-item .ai-order{ font-size:10.5px; color:var(--muted); font-weight:600; }
+  .avatar-item .ai-btns{ display:flex; flex-direction:column; gap:4px; }
+  .mini-btn{
+    width:24px; height:20px; border-radius:6px; border:none; background: rgba(58,46,34,0.1);
+    color:var(--ink); font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .preview-thumb{ width:64px; height:64px; border-radius:14px; object-fit:cover; border:1px solid var(--line); }
+  .preview-audio{ width:100%; }
+  .fursona-item{
+    display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:16px;
+    background: var(--glass-strong); border:1px solid var(--line); margin-bottom:10px;
+  }
+  .fursona-item img{ width:48px; height:48px; border-radius:10px; object-fit:cover; flex-shrink:0; }
+  .fursona-item .fi-info{ flex:1; min-width:0; }
+  .fursona-item .fi-label{ font-size:12.5px; font-weight:700; }
+  .fursona-item .fi-order{ font-size:10.5px; color:var(--muted); font-weight:600; }
+
+  .upload-zone{
+    border: 1.5px dashed var(--line); border-radius:16px; padding:22px; text-align:center;
+    color: var(--muted); font-size:12.5px; font-weight:600; cursor:pointer; margin-bottom:14px;
+    background: var(--glass-strong);
+  }
+  .upload-zone input{ display:none; }
+  .upload-zone.dragover{ border-color: var(--rust); border-style:solid; background: var(--glass); color: var(--ink); }
+
+  /* 上傳視窗的標記勾選。做成膠囊而不是裸的 checkbox —— 一整排表單元件裡，
+     裸 checkbox 小到很難點，也看不出「勾了」是什麼狀態 */
+  .upload-flags{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .upload-flags .flag{
+    display:inline-flex; align-items:center; gap:7px; margin:0; cursor:pointer;
+    padding:8px 14px; border-radius:999px; border:1px solid var(--line);
+    background:var(--glass-strong); font-size:12.5px; font-weight:600; color:var(--muted);
+    transition: background .18s ease, color .18s ease, border-color .18s ease;
+  }
+  .upload-flags .flag:has(input:checked){
+    background:var(--c1, #B85C34); border-color:transparent; color:#fff;
+  }
+  .upload-flags .flag input{ margin:0; width:15px; height:15px; accent-color:#fff; }
+
+  /* 牆面排場編輯器：跟前台同規格的兩欄瀑布流，照片保留原始長寬比 */
+  .wall-editor{ column-count:2; column-gap:10px; max-width:420px; margin:0 auto; }
+  .wall-editor .wall-head{ column-span:all; display:flex; align-items:center; gap:10px; padding-bottom:8px; flex-wrap:wrap; }
+  .wtile{
+    position:relative; break-inside:avoid; margin-bottom:10px; border-radius:16px;
+    border:1px solid var(--line); background:var(--glass-strong);
+    cursor:grab; user-select:none; -webkit-user-select:none;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .wtile img{ width:100%; height:auto; display:block; border-radius:16px; pointer-events:none; }
+  .wtile.lifted{
+    z-index:5; cursor:grabbing;
+    box-shadow:0 12px 30px rgba(0,0,0,.35);
+    outline:2px solid var(--rust); outline-offset:-2px;
+  }
+  .wtile.dragging{ opacity:.3; transition:opacity .18s ease; }
+  /* 命中相簿：描邊＋輕微放大（scale 不影響版面，所以相簿本身不會位移） */
+  .wtile.drop-target{ scale:1.06; z-index:4; }
+  .wtile.drop-target::after{
+    content:''; position:absolute; inset:-4px; border:3px solid var(--rust); border-radius:18px; pointer-events:none;
+    box-shadow:0 0 0 5px rgba(184,92,52,.18);
+  }
+  /* 跟著手指的那張縮圖。
+     **不要放大也不要旋轉** —— 縮放是以中心點計算，會把手指抓著的那個點
+     推開幾像素，拖起來就變成「不跟手」。浮起感只用陰影表現，尺寸維持 1:1。 */
+  .sortable-fallback{
+    opacity:1 !important; z-index:999;
+    border-radius:16px; overflow:hidden;
+    box-shadow:0 22px 46px rgba(0,0,0,.45);
+  }
+  /* 照片的刪除鈕讓開右上角給雲端標示，往下排一格。
+     :not([data-act]) 只挑到刪除鈕 —— 相簿內頁的 ⬆ 與 ☆ 也用 .wdel，但它們在左邊與正中，不要動 */
+  .wtile .wdel:not([data-act]){ top:32px; }
+  .wtile .wdel{
+    position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%;
+    background:rgba(0,0,0,.55); color:#fff; border:none; font-size:12px; cursor:pointer; z-index:2;
+    display:flex; align-items:center; justify-content:center;
+  }
+  /* 360 全景標記：跟刪除鈕同一種圓鈕，擺左下角，打開時整顆變亮 */
+  .wtile .wpano{
+    position:absolute; left:6px; bottom:6px; height:24px; padding:0 9px; border-radius:999px;
+    background:rgba(0,0,0,.55); color:#fff; border:none; font-size:11px; font-weight:700;
+    letter-spacing:.04em; cursor:pointer; z-index:2;
+    display:flex; align-items:center; gap:3px;
+  }
+  .wtile .wpano.on{ background:var(--c1, #B85C34); color:#fff; }
+  .wtile .whdr{ left:auto; right:6px; bottom:6px; }
+  .wtile .whdr.on{ background:#2E7D5B; }
+  /* 原檔放在哪個雲。這是**狀態不是操作**，所以不做成按鈕、不可點，
+     擺在右上角一眼就看得到；刪除與分享鈕往下順延排在它底下 */
+  .wtile .wcloud{
+    position:absolute; right:6px; top:6px; z-index:2;
+    height:20px; padding:0 7px; border-radius:999px;
+    background:rgba(0,0,0,.55); color:#fff;
+    font-size:9.5px; font-weight:800; letter-spacing:.04em;
+    display:flex; align-items:center; cursor:help;
+  }
+  .wtile .wcloud.r2{ background:rgba(232,116,32,.86); }      /* Cloudflare 橘 */
+  .wtile .wcloud.fb{ background:rgba(255,167,38,.86); color:#3A2E22; }  /* Firebase 黃 */
+
+  /* 分享連結鈕。四個角落都被佔走了（雲端標／✕／⬆／☆／360／HDR），
+     所以跟刪除鈕一起排在右緣的垂直列 —— 方塊再窄也不會跟誰擠在一起 */
+  .wtile .wshare{
+    position:absolute; right:6px; top:62px; width:24px; height:24px; border-radius:50%;
+    background:rgba(0,0,0,.55); color:#fff; border:none; font-size:11px;
+    cursor:pointer; z-index:2; display:flex; align-items:center; justify-content:center;
+  }
+  .wtile.album-tile .wshare{ top:6px; }   /* 相簿方塊沒有刪除鈕，直接坐右上角 */
+  .wshare.done, .btn.share-done{ background:#2E7D5B !important; color:#fff !important; }
+  .wtile.album-tile .astack{
+    position:absolute; left:4px; right:4px; top:-5px; height:18px; border-radius:14px;
+    background:var(--glass-strong); opacity:.7;
+  }
+  .wtile.album-tile img{ position:relative; z-index:1; aspect-ratio:1/1; object-fit:cover; }
+  .wtile.album-tile .aname{
+    position:absolute; left:0; right:0; bottom:0; z-index:2; padding:14px 8px 6px;
+    background:linear-gradient(transparent, rgba(0,0,0,.55)); color:#fff;
+    font-size:11px; font-weight:700; border-radius:0 0 16px 16px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .wtile .placeholder-cover{
+    width:100%; aspect-ratio:1/1; border-radius:16px; display:flex; align-items:center; justify-content:center;
+    font-size:26px; background:linear-gradient(135deg, var(--rust), var(--moss)); position:relative; z-index:1;
+  }
+  .album-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .album-row:last-child{ border-bottom:none; }
+  .album-row img, .album-row .placeholder-cover{ width:44px; height:44px; border-radius:10px; object-fit:cover; flex-shrink:0; font-size:18px; }
+  .album-row .info{ flex:1; min-width:0; }
+  .album-row .info .t{ font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .album-row .info .c{ font-size:11px; color:var(--muted); }
+  .album-row button{ width:auto; padding:6px 10px; font-size:11.5px; }
+  .empty{ font-size:12px; color:var(--muted); text-align:center; padding:20px 0; }
+  .spinner{ font-size:12px; color:var(--muted); text-align:center; padding:10px 0; }
+
+  .color-row{ display:flex; gap:8px; margin-bottom:4px; }
+  .color-row input[type="color"]{
+    width:44px; height:44px; padding:0; border:1px solid var(--line); border-radius:12px; cursor:pointer; flex-shrink:0;
+    background:none;
+  }
+  .color-row input[type="text"]{ flex:1; text-transform:uppercase; font-family:inherit; letter-spacing:0.06em; }
+  .theme-preview{
+    margin-top:16px; border-radius:16px; overflow:hidden; border:1px solid var(--line);
+    padding:16px; min-height:90px; position:relative;
+  }
+  .theme-preview .tp-tag{ display:inline-block; padding:6px 12px; border-radius:999px; font-size:11px; font-weight:700; margin-right:6px; }
+  .theme-preview .tp-btn{ display:inline-block; margin-top:10px; padding:8px 16px; border-radius:12px; font-size:12px; font-weight:700; }
+
+  /* ---------- 下拉選單 ----------
+     原生 select 在 Windows 上是灰底方框，跟整站的暖色玻璃完全不搭。
+     appearance:none 把原生外觀關掉，自己畫一個 ⌄ 箭頭（用 SVG 當背景圖，
+     不需要多包一層容器）。 */
+  select{
+    appearance:none; -webkit-appearance:none; -moz-appearance:none;
+    width:100%; font-family:inherit; font-size:13.5px; font-weight:600; color:var(--ink);
+    background-color: var(--glass-strong);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238C7A63' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position: right 14px center;
+    border:1px solid var(--line); border-radius:14px;
+    padding:12px 40px 12px 14px;
+    cursor:pointer;
+    transition: border-color .18s ease, box-shadow .18s ease;
+  }
+  select:hover{ border-color: rgba(184,92,52,.35); }
+  /* 展開的選項清單只有底色與字色能控制，至少讓它不要是刺眼的白 */
+  select option{ background:#FDF7EC; color:var(--ink); font-weight:600; }
+
+  /* ---------- 輸入框／選單的聚焦狀態 ---------- */
+  textarea:focus, input[type="text"]:focus, input[type="date"]:focus, select:focus{
+    outline:none;
+    border-color: var(--rust);
+    box-shadow: 0 0 0 3px rgba(184,92,52,.14);
+  }
+
+  /* ---------- 捲軸 ---------- */
+  *::-webkit-scrollbar{ width:10px; height:10px; }
+  *::-webkit-scrollbar-track{ background:transparent; }
+  *::-webkit-scrollbar-thumb{
+    background: rgba(140,122,99,.35); border-radius:10px;
+    border:2px solid transparent; background-clip:content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover{ background: rgba(140,122,99,.55); background-clip:content-box; }
+
+  /* ---------- 按鈕與小控件的手感 ---------- */
+  .btn{ transition: transform .14s var(--ease), box-shadow .18s ease, opacity .18s ease; }
+  .btn:hover{ box-shadow:0 6px 16px -8px rgba(58,46,34,.4); }
+  .btn-primary:hover{ opacity:.92; }
+  .mini-btn, .del-btn{ transition: transform .12s var(--ease), background .18s ease; }
+  .mini-btn:hover{ background: rgba(58,46,34,.18); }
+  .del-btn:hover{ background: rgba(184,69,61,.22); }
+  .mini-btn:active, .del-btn:active{ transform: scale(.9); }
+  .upload-zone{ transition: border-color .2s ease, background .2s ease, color .2s ease; }
+  .album-row{ transition: background .18s ease; border-radius:12px; }
+  .album-row:hover{ background: rgba(255,255,255,.25); }
+  input[type="color"]{ transition: transform .12s var(--ease); }
+  input[type="color"]:active{ transform: scale(.94); }
+
+  /* ---------- 自製對話框（取代瀏覽器原生 alert / confirm / prompt）---------- */
+  .ui-overlay{
+    position:fixed; inset:0; z-index:200;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+    background: rgba(58,46,34,.34);
+    backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%);
+    opacity:0; visibility:hidden;
+    transition: opacity .24s var(--ease), visibility .24s var(--ease);
+  }
+  .ui-overlay.show{ opacity:1; visibility:visible; }
+  .ui-dialog{
+    width:100%; max-width:380px;
+    background: var(--glass-strong);
+    border:1px solid var(--line); border-radius:26px;
+    padding:26px 24px 20px;
+    box-shadow: 0 30px 60px -20px rgba(58,46,34,.5);
+    transform: scale(.94) translateY(8px);
+    transition: transform .26s var(--ease);
+  }
+  .ui-overlay.show .ui-dialog{ transform: scale(1) translateY(0); }
+  .ui-dialog h3{ font-size:16px; font-weight:800; margin-bottom:10px; }
+  .ui-dialog .ui-msg{ font-size:13px; line-height:1.75; color:var(--ink); white-space:pre-line; }
+  .ui-dialog input[type="text"]{ margin-top:14px; }
+  .ui-dialog .ui-row{ display:flex; gap:10px; margin-top:22px; }
+  .ui-dialog .ui-row .btn{ flex:1; justify-content:center; padding:13px 18px; }
+  /* 對話框裡的刪除鈕要夠明確 —— 淡淡的紅底在玻璃上幾乎看不出是破壞性動作 */
+  .ui-dialog .btn-danger{ background: var(--danger); color:#FFF3EF; }
+  .ui-dialog .btn-danger:hover{ opacity:.92; }
+
+  /* ---------- 螢幕適配 ----------
+     後台原本也只照手機寬度設計（整頁鎖 480px、照片牆編輯區只有兩欄），
+     在桌機上大半個畫面是空的，排照片也擠。這裡把容器逐級放寬、照片牆加欄。
+     輸入框另外設上限 —— 不然寬螢幕上一個文字框會拉到上千像素，反而更難填。
+     放在樣式最後面才蓋得過前面的預設值。 */
+  @media (min-width: 700px){
+    body{ padding: 32px 24px 72px; }
+    .wrap{ max-width: 680px; }
+    .wall-editor{ max-width:100%; column-count:3; column-gap:12px; }
+    .card input[type="text"], .card input[type="date"],
+    .card textarea, .card select, .btn-block{ max-width:560px; }
+  }
+
+  /* 從這裡開始卡片改成並排。
+     單欄直排在手機上剛好，但桌機上二十幾張卡片疊成一長條，找一個設定要捲很久，
+     而且旁邊將近一半的畫面是空的。用 grid 的 auto-fill 讓欄數自己跟著寬度長，
+     不用為每個尺寸各寫一組欄數。
+
+     `align-items:start` 是必要的 —— 預設 stretch 會把同一列的卡片拉成一樣高，
+     矮的卡片下面就多出一段空白。
+
+     `:has()` 挑出「裡面有瀑布流」的卡片（牆面排場、垃圾桶）讓它們獨佔整行：
+     那是拖曳排照片的工作區，擠成半欄會很難用。用 :has 而不是另外加 class，
+     以後新增含瀑布流的卡片會自動比照辦理。 */
+  @media (min-width: 1100px){
+    .wrap{ max-width: 1180px; }
+    .wall-editor{ column-count:4; }
+
+    /* 一定要寫成 `.panel.active` ——「顯示中的分頁」本來就是靠 `.panel.active{display:block}`
+       決定的，那條選取器比單純的 `.panel` 更明確，媒體查詢也蓋不過它。
+       寫 `.panel{display:grid}` 會安靜地無效（實測過，版面完全沒變）。 */
+    .panel.active{
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      align-items:start;
+      gap:14px;
+    }
+    /* 卡片本來靠 margin-top 拉開間距，交給 grid 的 gap 之後要收掉，否則上緣會多一截 */
+    .panel.active > .card{ margin-top:0; }
+    .panel.active > .card:has(.wall-editor),
+    .panel.active > .card:has(#usageBody){ grid-column: 1 / -1; }
+  }
+
+  @media (min-width: 1500px){
+    .wrap{ max-width: 1440px; }
+    .wall-editor{ column-count:5; }
+  }
+
+  @media (min-width: 1800px){
+    .wrap{ max-width: 1680px; }
+    .wall-editor{ column-count:6; }
+  }
+</style>
+<script>
+  // 先套用記住的配色（與前台共用同一份快取）
+  (function(){
+    try{
+      const cached = localStorage.getItem('julian_theme_colors');
+      if(!cached) return;
+      const t = JSON.parse(cached);
+      if(!t.color1 || !t.color2 || !t.color3) return;
+
+      function hexToRgb(hex){
+        hex = (hex||'').replace('#','').trim();
+        if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+        const num = parseInt(hex,16);
+        if(isNaN(num)) return {r:0,g:0,b:0};
+        return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+      }
+      function mix(c1,c2,t){ return { r:c1.r+(c2.r-c1.r)*t, g:c1.g+(c2.g-c1.g)*t, b:c1.b+(c2.b-c1.b)*t }; }
+      function rgba(c,a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
+      function toHex(r,g,b){ return '#'+[r,g,b].map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join(''); }
+
+      const c1 = hexToRgb(t.color1), c2 = hexToRgb(t.color2);
+      const c3Picked = hexToRgb(t.color3);
+      const black = {r:0,g:0,b:0}, white = {r:255,g:255,b:255};
+      const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const c3 = systemDark ? mix(c3Picked, black, 0.82) : c3Picked;
+      const isLight = !systemDark;
+      const ink = isLight ? mix(c3, black, 0.82) : mix(c3, white, 0.9);
+      const muted = isLight ? mix(c3, black, 0.5) : mix(c3, white, 0.55);
+      const glassBase = isLight ? white : mix(c3, black, 0.4);
+
+      const root = document.documentElement.style;
+      root.setProperty('--rust', t.color1);
+      root.setProperty('--moss', t.color2);
+      root.setProperty('--bg-base', toHex(c3.r, c3.g, c3.b));
+      root.setProperty('--ink', toHex(ink.r, ink.g, ink.b));
+      root.setProperty('--muted', toHex(muted.r, muted.g, muted.b));
+      root.setProperty('--line', isLight ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.10)');
+      root.setProperty('--glass', rgba(glassBase, isLight?0.38:0.55));
+      root.setProperty('--glass-strong', rgba(glassBase, isLight?0.58:0.72));
+      root.setProperty('--bg-radial-1', rgba(c1, 0.55));
+      root.setProperty('--bg-radial-2', rgba(mix(c1,c2,0.5), 0.5));
+      root.setProperty('--bg-radial-3', rgba(c2, 0.55));
+      root.setProperty('--bg-radial-4', rgba(mix(c3,c1,0.3), 0.4));
+    }catch(err){}
+  })();
+</script>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 登入畫面 -->
+  <div id="loginView">
+    <div class="login-card">
+      <h1>帝國後台</h1>
+      <p>報上名號，才動得了這片地盤</p>
+      <button class="google-btn" id="googleLoginBtn">🔐 用 Google 報上名號</button>
+      <div class="login-error" id="loginError">這個帳號沒有資格</div>
+    </div>
+  </div>
+
+  <!-- 主畫面 -->
+  <div id="appView">
+    <header class="top">
+      <div class="who">
+        <img id="userAvatar" src="" alt="">
+        <span class="name" id="userName"></span>
+      </div>
+      <button class="logout-btn" id="logoutBtn">登出</button>
+    </header>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="bio">底細</div>
+      <div class="tab" data-tab="avatar">頭貼</div>
+      <div class="tab" data-tab="ocart">OC 美術圖</div>
+      <div class="tab" data-tab="calendar">行程</div>
+      <div class="tab" data-tab="gallery">照片牆</div>
+      <div class="tab" data-tab="settings">規矩</div>
+    </div>
+
+    <!-- 自介 -->
+    <div class="panel active" id="panel-bio">
+      <div class="card">
+        <h2>開場白</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">首頁名字底下那一行。一句話就要讓人記住你是誰，例如「紫毛狐狸 · 攝影師 · 快門自由」。</p>
+        <label>內容</label>
+        <input type="text" id="subtitleText" placeholder="紫毛狐狸 · 攝影師 · 快門自由">
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="saveSubtitleBtn">收下開場白</button>
+          <span class="save-status" id="subtitleStatus">收下了 ✓</span>
+        </div>
+      </div>
+      <div class="card">
+        <h2>底細</h2>
+        <label>正文</label>
+        <textarea id="bioText" placeholder="嗨嗨，我是朱利安..."></textarea>
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="saveBioBtn">收下底細</button>
+          <span class="save-status" id="bioStatus">收下了 ✓</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 頭貼庫 -->
+    <div class="panel" id="panel-avatar">
+      <div class="card">
+        <h2>添個頭貼</h2>
+        <label class="upload-zone" id="avatarUploadZone">
+          <span id="avatarZoneText">🖼️ 點一下挑頭貼</span>
+          <input type="file" id="avatarInput" accept="image/*">
+        </label>
+        <label>繪師（選填）</label>
+        <input type="text" id="avatarArtist" placeholder="這張誰畫的">
+        <button class="btn btn-primary btn-block" id="avatarUploadBtn">收進頭貼庫</button>
+        <div class="spinner" id="avatarSpinner" style="display:none;">出貨中…</div>
+      </div>
+      <div class="card">
+        <h2>頭貼排場</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">首頁會照這個順序輪流亮，點旁邊的箭頭調先後。</p>
+        <div id="avatarList"><div class="empty">頭貼庫還是空的</div></div>
+      </div>
+    </div>
+
+    <!-- OC 美術圖 -->
+    <div class="panel" id="panel-ocart">
+      <div class="card">
+        <h2>添張 OC 美術圖</h2>
+        <label class="upload-zone" id="ocartUploadZone">
+          <span id="ocartZoneText">🖼️ 點一下挑委託圖</span>
+          <input type="file" id="ocartInput" accept="image/*">
+        </label>
+        <label>繪師（選填）</label>
+        <input type="text" id="ocartArtist" placeholder="這張誰畫的">
+        <button class="btn btn-primary btn-block" id="ocartUploadBtn">收進 OC 美術圖</button>
+        <div class="spinner" id="ocartSpinner" style="display:none;">出貨中…</div>
+      </div>
+      <div class="card">
+        <h2>排序</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">前台照這個順序亮，點箭頭調先後。</p>
+        <div id="ocartList"><div class="empty">OC 美術圖還是空的</div></div>
+      </div>
+    </div>
+
+    <!-- 行事曆 -->
+    <div class="panel" id="panel-calendar">
+      <div class="card">
+        <h2>排進行程</h2>
+        <label>標題</label>
+        <input type="text" id="eventTitle" placeholder="例如：外拍活動">
+        <label>日期</label>
+        <input type="date" id="eventDate">
+        <label>註記（不想寫就空著）</label>
+        <input type="text" id="eventDesc" placeholder="簡短說明">
+        <button class="btn btn-primary btn-block" id="addEventBtn">排進行程</button>
+      </div>
+      <div class="card">
+        <h2>排著的行程</h2>
+        <div id="eventList"><div class="empty">行程表上還是空的</div></div>
+      </div>
+    </div>
+
+    <!-- 照片牆 -->
+    <div class="panel" id="panel-gallery">
+      <div class="card">
+        <h2>進貨</h2>
+        <label class="upload-zone" id="uploadZone">
+          <span id="uploadZoneText">📷 點一下挑照片（一次多張沒問題，也可以直接把檔案拖進來）</span>
+          <input type="file" id="photoInput" accept="image/*,.tif,.tiff" multiple>
+        </label>
+        <label>圖說（不想寫就空著，整批共用）</label>
+        <input type="text" id="photoCaption" placeholder="這批的圖說">
+        <label>要放的金庫（不選就散在牆上）</label>
+        <select id="photoAlbumSelect"><option value="">牆上散著就好</option></select>
+        <label>轉檔方式</label>
+        <select id="uploadMode">
+          <option value="local">R2 · 本地轉檔（預設，這台自己轉、最省空間）</option>
+          <option value="cloud">Firebase · 雲端轉檔（省電，大檔或沒電的時候用）</option>
+        </select>
+        <!-- 整批共用的標記。以前要傳完再回牆上一張張點，這裡先勾好省一趟。
+             牆上的小按鈕仍在，個別要改照樣改得動 -->
+        <label>標記（整批共用，之後在牆上還能單張改）</label>
+        <div class="upload-flags">
+          <label class="flag"><input type="checkbox" id="uploadPano"> ◎ 360 全景</label>
+          <label class="flag"><input type="checkbox" id="uploadHdr"> HDR</label>
+        </div>
+        <button class="btn btn-primary btn-block" id="uploadBtn">出貨</button>
+        <div id="uploadProgress" style="display:none; margin-top:10px; font-size:12px; line-height:1.9; color:var(--muted); word-break:break-all;"></div>
+      </div>
+
+      <div class="card">
+        <h2>相簿</h2>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <input type="text" id="newAlbumName" placeholder="新金庫叫什麼" style="flex:1; margin:0;">
+          <button class="btn btn-primary" id="createAlbumBtn" style="width:auto; padding:0 16px;">建立</button>
+        </div>
+        <div id="albumList"><div class="empty">一個金庫都還沒有</div></div>
+      </div>
+
+      <div class="card">
+        <h2>牆面排場</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">這裡排成什麼樣，前台就是什麼樣。長按（手機）或按住（滑鼠）拖著挪順序；把照片拖到相簿方塊上放開，就收進那個金庫。點相簿方塊可以進去管裡面的貨。</p>
+        <div id="wallEditor" class="wall-editor"><div class="empty">載入中…</div></div>
+      </div>
+
+      <div class="card">
+        <h2 class="with-action">
+          <span id="trashTitle">🗑 垃圾桶</span>
+          <span>
+            <button class="mini-btn" id="trashEmptyBtn" style="display:none;">清空</button>
+            <button class="mini-btn" id="trashToggle">展開</button>
+          </span>
+        </h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">刪掉的貨先擱在這，<b>30 天內都能復原</b>，到期雲端自動清掉。擱著的照片<b>還是壓著地盤</b>，想立刻空出來就按「清空」。</p>
+        <div id="trashWall" class="wall-editor" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- 設定：Fursona 設定圖 + 彩蛋 -->
+    <div class="panel" id="panel-settings">
+      <div class="card">
+        <h2 class="with-action">
+          雲端用量
+          <button class="mini-btn" id="usageRefresh">↻ 重新整理</button>
+        </h2>
+        <div id="usageBody">
+          <div class="spinner" id="usageLoading">翻帳本中…</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Fursona 設定圖</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">新的會排在原本那張紫毛下面，「關於我」點開後照順序全部亮出來。</p>
+        <label class="upload-zone" id="fursonaUploadZone">
+          <span id="fursonaZoneText">🎨 點一下挑設定圖</span>
+          <input type="file" id="fursonaInput" accept="image/*">
+        </label>
+        <label>標籤（選填，例如「第二設定」）</label>
+        <input type="text" id="fursonaLabel" placeholder="這張的註記">
+        <button class="btn btn-primary btn-block" id="fursonaUploadBtn">收進設定圖</button>
+        <div class="spinner" id="fursonaSpinner" style="display:none;">出貨中…</div>
+      </div>
+      <div class="card">
+        <h2>手上的設定圖</h2>
+        <div id="fursonaList"><div class="empty">設定圖還一張都沒有</div></div>
+      </div>
+
+      <div class="card">
+        <h2>機關・一階頭貼</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">長按或連點頭貼 11 下踩中時，換上的那張。</p>
+        <div id="eggAvatarPreview" style="margin-bottom:12px;"></div>
+        <label class="upload-zone" id="eggAvatarUploadZone">
+          <span id="eggAvatarZoneText">🖼️ 換一張機關頭貼</span>
+          <input type="file" id="eggAvatarInput" accept="image/*">
+        </label>
+        <button class="btn btn-primary btn-block" id="eggAvatarSaveBtn">換上機關頭貼</button>
+        <div class="spinner" id="eggAvatarSpinner" style="display:none;">出貨中…</div>
+      </div>
+
+      <div class="card">
+        <h2>機關・一階音效</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">踩中機關時放的那段。</p>
+        <div id="eggSoundPreview" style="margin-bottom:12px;"></div>
+        <label class="upload-zone" id="eggSoundUploadZone">
+          <span id="eggSoundZoneText">🔊 換一段音效</span>
+          <input type="file" id="eggSoundInput" accept="audio/*">
+        </label>
+        <button class="btn btn-primary btn-block" id="eggSoundSaveBtn">換上機關音效</button>
+        <div class="spinner" id="eggSoundSpinner" style="display:none;">出貨中…</div>
+      </div>
+
+      <div class="card">
+        <h2>機關・二階跳轉網址</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">一階踩中之後，再長按／連點 11 下就跳去這個網址。</p>
+        <label>網址</label>
+        <input type="text" id="stage2UrlInput" placeholder="https://...">
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="stage2UrlSaveBtn">收下網址</button>
+          <span class="save-status" id="stage2UrlStatus">收下了 ✓</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>「私心歌單」那個彈窗</h2>
+        <label>標題</label>
+        <input type="text" id="musicTitleInput" placeholder="私心歌單">
+        <label>說明文字</label>
+        <input type="text" id="musicDescInput" placeholder="最近單曲循環的清單...">
+        <label>Spotify 歌單網址</label>
+        <input type="text" id="musicUrlInput" placeholder="https://open.spotify.com/playlist/...">
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="musicSaveBtn">儲存</button>
+          <span class="save-status" id="musicStatus">收下了 ✓</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>「攝影作品」那個確認窗</h2>
+        <label>標題</label>
+        <input type="text" id="photoTitleInput" placeholder="要前往 Flickr 嗎？">
+        <label>說明文字</label>
+        <input type="text" id="photoDescInput" placeholder="即將離開這個網站...">
+        <label>Flickr 相簿網址</label>
+        <input type="text" id="photoUrlInput" placeholder="https://www.flickr.com/...">
+        <div style="display:flex; align-items:center; margin-top:14px;">
+          <button class="btn btn-primary" id="photoSaveBtn">儲存</button>
+          <span class="save-status" id="photoStatus">收下了 ✓</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>舊圖快取補件（做一次就好）</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">把「這顆按鈕出現之前」進的舊圖片／音效補上快取設定，治好前台換頭貼會卡一下的毛病。之後新進的貨自動帶著設定，按過一次就不用再按。</p>
+        <button class="btn btn-primary btn-block" id="fixCacheBtn">開始補件</button>
+        <div class="spinner" id="fixCacheStatus" style="display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2>原檔搬去 R2</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">把還壓在 Firebase 的照片原檔搬去 Cloudflare R2（縮圖不動）。每張先複製、核對過了才刪 Firebase 那份，中途停下也不會掉東西。每月 1 號清晨自己會跑一次，這顆是給第一次大搬家、或想立刻清出地盤時用的。</p>
+        <button class="btn btn-primary btn-block" id="migrateBtn">開始搬</button>
+        <div class="spinner" id="migrateStatus" style="display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2>地盤配色</h2>
+        <p style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">挑 3 個顏色，整套配色（文字、邊框、毛玻璃、背景漸層）網站自己會從這 3 色算出來，就像 Android Material You 那套。</p>
+
+        <label>主色（鎮場面的那個色，按鈕、標籤都吃它）</label>
+        <div class="color-row">
+          <input type="color" id="themeColor1Picker" value="#B85C34">
+          <input type="text" id="themeColor1Hex" placeholder="#B85C34" maxlength="7">
+        </div>
+
+        <label>輔色（第二把交椅）</label>
+        <div class="color-row">
+          <input type="color" id="themeColor2Picker" value="#6E7A52">
+          <input type="text" id="themeColor2Hex" placeholder="#6E7A52" maxlength="7">
+        </div>
+
+        <label>背景色（決定整片地盤的深淺）</label>
+        <div class="color-row">
+          <input type="color" id="themeColor3Picker" value="#EFE4D2">
+          <input type="text" id="themeColor3Hex" placeholder="#EFE4D2" maxlength="7">
+        </div>
+
+        <div id="themePreview" class="theme-preview"></div>
+
+        <div style="display:flex; align-items:center; margin-top:14px; gap:8px;">
+          <button class="btn btn-primary" id="themeSaveBtn">套上去，收下</button>
+          <button class="btn btn-danger" id="themeResetBtn">打回原形</button>
+          <span class="save-status" id="themeStatus">收下了 ✓</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 自製對話框：取代瀏覽器原生的 alert / confirm / prompt（那三個沒辦法套樣式） -->
+<div class="ui-overlay" id="uiOverlay">
+  <div class="ui-dialog">
+    <h3 id="uiTitle"></h3>
+    <div class="ui-msg" id="uiMsg"></div>
+    <input type="text" id="uiInput" style="display:none;">
+    <div class="ui-row">
+      <button class="btn" id="uiCancel">取消</button>
+      <button class="btn btn-primary" id="uiOk">確定</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, getDocs, setDoc, collection, addDoc, deleteDoc, onSnapshot, writeBatch,
+    query, orderBy, serverTimestamp, deleteField
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+  import {
+    getStorage, ref, uploadBytes, getDownloadURL, deleteObject, updateMetadata
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
+  import {
+    getFunctions, httpsCallable
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAfyM4g54lnJh3mQhJ3zU50U75mB_04MHk",
+    authDomain: "julian-site-c5dd3.firebaseapp.com",
+    projectId: "julian-site-c5dd3",
+    storageBucket: "julian-site-c5dd3.firebasestorage.app",
+    messagingSenderId: "695308416375",
+    appId: "1:695308416375:web:2b3be5f7403ab323085d72"
+  };
+
+  // 只有這個 UID 能登入管理後台
+  const ALLOWED_UID = "x1gZPujgrYTVFX2bhxOdoG7WsJN2";
+
+  /* ---------- 自製對話框 ----------
+     瀏覽器原生的 alert / confirm / prompt 完全不能套樣式，
+     在暖色玻璃的介面裡會冒出一個灰色系統方框，很突兀。
+     這三個都回傳 Promise，呼叫端把原本的 confirm(...) 換成 await uiConfirm(...) 即可。 */
+  const uiOverlay = document.getElementById('uiOverlay');
+  const uiTitleEl = document.getElementById('uiTitle');
+  const uiMsgEl   = document.getElementById('uiMsg');
+  const uiInputEl = document.getElementById('uiInput');
+  const uiOkBtn   = document.getElementById('uiOk');
+  const uiCancelBtn = document.getElementById('uiCancel');
+
+  function openUiDialog({ title, message, input, value, okLabel, cancelLabel, danger }){
+    return new Promise(resolve=>{
+      uiTitleEl.textContent = title || '';
+      uiTitleEl.style.display = title ? 'block' : 'none';
+      uiMsgEl.textContent = message || '';
+      uiMsgEl.style.display = message ? 'block' : 'none';
+      uiInputEl.style.display = input ? 'block' : 'none';
+      uiInputEl.value = value || '';
+      uiOkBtn.textContent = okLabel || '確定';
+      uiOkBtn.classList.toggle('btn-danger', !!danger);
+      uiOkBtn.classList.toggle('btn-primary', !danger);
+      uiCancelBtn.style.display = cancelLabel === null ? 'none' : 'flex';
+      uiCancelBtn.textContent = cancelLabel || '取消';
+      uiOverlay.classList.add('show');
+      if(input) setTimeout(()=>{ uiInputEl.focus(); uiInputEl.select(); }, 60);
+
+      const done = (result)=>{
+        uiOverlay.classList.remove('show');
+        uiOkBtn.onclick = null; uiCancelBtn.onclick = null;
+        uiInputEl.onkeydown = null; uiOverlay.onclick = null;
+        resolve(result);
+      };
+      uiOkBtn.onclick = ()=> done(input ? uiInputEl.value : true);
+      uiCancelBtn.onclick = ()=> done(input ? null : false);
+      uiOverlay.onclick = (e)=>{ if(e.target === uiOverlay) done(input ? null : false); };
+      uiInputEl.onkeydown = (e)=>{
+        if(e.key === 'Enter') done(uiInputEl.value);
+        if(e.key === 'Escape') done(null);
+      };
+    });
+  }
+
+  const uiAlert = (message, title)=>
+    openUiDialog({ title: title || '提示', message, cancelLabel: null, okLabel: '知道了' });
+  const uiConfirm = (message, opts = {})=>
+    openUiDialog({ title: opts.title || '確認', message, okLabel: opts.okLabel || '確定', danger: opts.danger });
+  const uiPrompt = (title, value)=>
+    openUiDialog({ title, input: true, value, okLabel: '儲存' });
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+  const provider = new GoogleAuthProvider();
+
+  // 雲端函式（asia-east1 = 台灣機房）。原始檔改存 Cloudflare R2 之後，
+  // 跟 R2 的所有往來（拿上傳網址、刪檔、搬移）都經過這幾支後端函式，
+  // R2 的金鑰只存在後端，這個頁面永遠拿不到。
+  const fns = getFunctions(app, 'asia-east1');
+  const r2UploadTicket = httpsCallable(fns, 'r2UploadTicket');
+  const r2Delete = httpsCallable(fns, 'r2Delete');
+  // 搬移一批要跑比較久，逾時放寬到 9 分鐘（跟後端函式的上限一致）
+  const migrateOriginalsNow = httpsCallable(fns, 'migrateOriginalsNow', { timeout: 540000 });
+  // 流量計：要打 7 次 Monitoring ＋ 列兩個 bucket，逾時放寬到 2 分鐘
+  const usageReport = httpsCallable(fns, 'usageReport', { timeout: 120000 });
+  // 清空垃圾桶：一張張刪檔（含 R2），張數多會跑一陣子，逾時放寬到 9 分鐘
+  const emptyTrash = httpsCallable(fns, 'emptyTrash', { timeout: 540000 });
+
+  // 檔名帶時間戳記、內容不變，可放心快取一年
+  const IMG_CACHE_META = { cacheControl: 'public, max-age=31536000, immutable' };
+
+  const loginView = document.getElementById('loginView');
+  const appView = document.getElementById('appView');
+  const loginError = document.getElementById('loginError');
+
+  document.getElementById('googleLoginBtn').addEventListener('click', async ()=>{
+    loginError.style.display = 'none';
+    try{
+      await signInWithPopup(auth, provider);
+    }catch(err){
+      console.error(err);
+    }
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', ()=> signOut(auth));
+
+  onAuthStateChanged(auth, (user)=>{
+    if(user && user.uid === ALLOWED_UID){
+      loginView.style.display = 'none';
+      appView.style.display = 'block';
+      document.getElementById('userAvatar').src = user.photoURL || '';
+      document.getElementById('userName').textContent = user.displayName || user.email;
+      initBio();
+      initAvatars();
+      initOcArt();
+      initCalendar();
+      initGallery();
+      initFursonas();
+      initEggSettings();
+      initAboutModals();
+      initThemeColors();
+      initFixCache();
+    } else if(user){
+      // 非本人帳號
+      loginError.style.display = 'block';
+      signOut(auth);
+    } else {
+      loginView.style.display = 'flex';
+      appView.style.display = 'none';
+    }
+  });
+
+  // ---------- 分頁切換 ----------
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(x=> x.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(x=> x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+      // 流量計要打好幾支雲端 API，第一次進「設定」才載入，不是一開頁就跑
+      if(t.dataset.tab === 'settings') loadUsage(false);
+    });
+  });
+
+  // ---------- 自介 + 開場白 ----------
+  function initBio(){
+    const bioRef = doc(db, 'profile', 'main');
+    getDoc(bioRef).then(snap=>{
+      const data = snap.exists() ? snap.data() : {};
+      document.getElementById('bioText').value = data.bio || '';
+      document.getElementById('subtitleText').value = data.subtitle || '';
+    });
+    document.getElementById('saveBioBtn').onclick = async ()=>{
+      const bio = document.getElementById('bioText').value;
+      await setDoc(bioRef, { bio, updatedAt: serverTimestamp() }, { merge:true });
+      const status = document.getElementById('bioStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+    document.getElementById('saveSubtitleBtn').onclick = async ()=>{
+      const subtitle = document.getElementById('subtitleText').value;
+      await setDoc(bioRef, { subtitle, updatedAt: serverTimestamp() }, { merge:true });
+      const status = document.getElementById('subtitleStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+  }
+
+  // ---------- 行事曆 ----------
+  function initCalendar(){
+    const colRef = collection(db, 'calendar');
+    const q = query(colRef, orderBy('date', 'asc'));
+    onSnapshot(q, (snap)=>{
+      const list = document.getElementById('eventList');
+      if(snap.empty){ list.innerHTML = '<div class="empty">行程表上還是空的</div>'; return; }
+      list.innerHTML = '';
+      snap.forEach(d=>{
+        const ev = d.data();
+        const el = document.createElement('div');
+        el.className = 'event-item';
+        el.innerHTML = `
+          <div class="info">
+            <div class="ttl">${escapeHtml(ev.title||'')}</div>
+            <div class="dt">${escapeHtml(ev.date||'')}</div>
+            ${ev.description ? `<div class="desc">${escapeHtml(ev.description)}</div>` : ''}
+          </div>
+          <button class="del-btn">✕</button>
+        `;
+        el.querySelector('.del-btn').addEventListener('click', ()=> deleteDoc(doc(db,'calendar', d.id)));
+        list.appendChild(el);
+      });
+    });
+
+    document.getElementById('addEventBtn').onclick = async ()=>{
+      const title = document.getElementById('eventTitle').value.trim();
+      const date = document.getElementById('eventDate').value;
+      const description = document.getElementById('eventDesc').value.trim();
+      if(!title || !date) return;
+      await addDoc(colRef, { title, date, description, createdAt: serverTimestamp() });
+      document.getElementById('eventTitle').value = '';
+      document.getElementById('eventDate').value = '';
+      document.getElementById('eventDesc').value = '';
+    };
+  }
+
+  // 圖檔轉 WebP 縮圖（照片牆 1600 / 頭貼 512）。原生解碼失敗才載入 TIFF 解碼器；全失敗回 null 不發布
+  // （JPEG XL 支援已移除——手機 App 讀不了這個格式，兩邊統一不收）
+  async function decodeToCanvas(file, maxSize){
+    const MAX = maxSize;
+    const drawScaled = (srcW, srcH, drawFn)=>{
+      const scale = Math.min(1, MAX / Math.max(srcW, srcH));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(srcW * scale);
+      canvas.height = Math.round(srcH * scale);
+      drawFn(canvas.getContext('2d'), canvas.width, canvas.height);
+      return canvas;
+    };
+
+    // 原生解碼；大圖用 resize 選項先在解碼階段縮小，避免一億像素照片吃爆記憶體
+    try{
+      let bmp;
+      try{
+        const probe = await createImageBitmap(file);
+        const longest = Math.max(probe.width, probe.height);
+        if(longest > MAX){
+          const scale = MAX / longest;
+          bmp = await createImageBitmap(file, {
+            resizeWidth: Math.round(probe.width * scale),
+            resizeHeight: Math.round(probe.height * scale),
+            resizeQuality: 'high'
+          });
+          probe.close();
+        }else{
+          bmp = probe;
+        }
+      }catch(inner){
+        bmp = await createImageBitmap(file); // 不支援 resize 選項的瀏覽器退回一般解碼
+      }
+      const c = drawScaled(bmp.width, bmp.height, (ctx, w, h)=> ctx.drawImage(bmp, 0, 0, w, h));
+      bmp.close();
+      return c;
+    }catch(err){}
+
+    const name = (file.name || '').toLowerCase();
+    // ImageData 先畫到全尺寸再縮
+    const fromImageData = (imageData)=>{
+      const full = document.createElement('canvas');
+      full.width = imageData.width; full.height = imageData.height;
+      full.getContext('2d').putImageData(imageData, 0, 0);
+      return drawScaled(full.width, full.height, (ctx, w, h)=> ctx.drawImage(full, 0, 0, w, h));
+    };
+
+    // TIFF
+    if(file.type === 'image/tiff' || /\.tiff?$/.test(name)){
+      try{
+        const mod = await import('https://cdn.jsdelivr.net/npm/utif2@4.1.0/+esm');
+        const UTIF = mod.default || mod;
+        const buf = await file.arrayBuffer();
+        const ifds = UTIF.decode(buf);
+        UTIF.decodeImage(buf, ifds[0]);
+        const rgba = UTIF.toRGBA8(ifds[0]);
+        return fromImageData(new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height));
+      }catch(err){ console.warn('TIFF 解碼失敗', err); }
+    }
+
+    return null;
+  }
+
+  async function makeWebpThumb(file, maxSize){
+    const canvas = await decodeToCanvas(file, maxSize);
+    if(!canvas) return null;
+    const blob = await new Promise(res=> canvas.toBlob(res, 'image/webp', 0.82));
+    // Safari 輸出不了 WebP 就退回 JPEG
+    if(blob && blob.type === 'image/webp') return { blob, ext: 'webp', type: 'image/webp' };
+    const jpg = await new Promise(res=> canvas.toBlob(res, 'image/jpeg', 0.85));
+    return jpg ? { blob: jpg, ext: 'jpg', type: 'image/jpeg' } : null;
+  }
+
+
+  // ---------- 頭貼庫 ----------
+  function initAvatars(){
+    const colRef = collection(db, 'avatars');
+    const q = query(colRef, orderBy('order', 'asc'));
+
+    onSnapshot(q, (snap)=>{
+      const list = document.getElementById('avatarList');
+      if(snap.empty){ list.innerHTML = '<div class="empty">頭貼庫還是空的</div>'; return; }
+      const docs = [];
+      snap.forEach(d=> docs.push({ id:d.id, ...d.data() }));
+
+      list.innerHTML = '';
+      docs.forEach((a, idx)=>{
+        const el = document.createElement('div');
+        el.className = 'avatar-item';
+        el.innerHTML = `
+          <img src="${a.imageUrl}" alt="">
+          <div class="ai-info">
+            <div class="ai-artist">${escapeHtml(a.artist || '（沒標繪師）')}</div>
+            <div class="ai-order">順序 ${idx + 1}</div>
+          </div>
+          <div class="ai-btns">
+            <button class="mini-btn" data-dir="up">▲</button>
+            <button class="mini-btn" data-dir="down">▼</button>
+          </div>
+          <button class="del-btn">✕</button>
+        `;
+        el.querySelector('[data-dir="up"]').addEventListener('click', ()=> swapOrder(docs, idx, idx-1));
+        el.querySelector('[data-dir="down"]').addEventListener('click', ()=> swapOrder(docs, idx, idx+1));
+        el.querySelector('.del-btn').addEventListener('click', async ()=>{
+          try{ if(a.storagePath) await deleteObject(ref(storage, a.storagePath)); }catch(e){}
+          await deleteDoc(doc(db,'avatars', a.id));
+        });
+        list.appendChild(el);
+      });
+    });
+
+    async function swapOrder(docs, i, j){
+      if(j < 0 || j >= docs.length) return;
+      const a = docs[i], b = docs[j];
+      const orderA = a.order, orderB = b.order;
+      await setDoc(doc(db,'avatars', a.id), { order: orderB }, { merge:true });
+      await setDoc(doc(db,'avatars', b.id), { order: orderA }, { merge:true });
+    }
+
+    let selectedAvatarFile = null;
+    document.getElementById('avatarInput').addEventListener('change', (e)=>{
+      selectedAvatarFile = e.target.files[0] || null;
+      document.getElementById('avatarZoneText').textContent = selectedAvatarFile ? `挑了：${selectedAvatarFile.name}` : '🖼️ 點一下挑頭貼';
+    });
+
+    document.getElementById('avatarUploadBtn').onclick = async ()=>{
+      if(!selectedAvatarFile) return;
+      const spinner = document.getElementById('avatarSpinner');
+      spinner.style.display = 'block';
+      try{
+        const snap = await getDocs(query(colRef, orderBy('order','desc')));
+        let maxOrder = 0;
+        snap.forEach(d=>{ const o = d.data().order || 0; if(o > maxOrder) maxOrder = o; });
+
+        // 頭貼顯示區只有 92px，512px WebP 綽綽有餘
+        const thumb = await makeWebpThumb(selectedAvatarFile, 512);
+        const upBlob = thumb ? thumb.blob : selectedAvatarFile; // 轉不動退回原檔
+        const upExt  = thumb ? thumb.ext  : (selectedAvatarFile.name.split('.').pop() || 'img');
+        const upMeta = thumb ? { ...IMG_CACHE_META, contentType: thumb.type } : IMG_CACHE_META;
+
+        const path = `avatars/${Date.now()}_avatar.${upExt}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, upBlob, upMeta);
+        const url = await getDownloadURL(sRef);
+        await addDoc(colRef, {
+          imageUrl: url,
+          storagePath: path,
+          artist: document.getElementById('avatarArtist').value.trim(),
+          order: maxOrder + 1,
+          uploadedAt: serverTimestamp()
+        });
+        document.getElementById('avatarArtist').value = '';
+        document.getElementById('avatarInput').value = '';
+        document.getElementById('avatarZoneText').textContent = '🖼️ 點一下挑頭貼';
+        selectedAvatarFile = null;
+      }catch(err){
+        console.error(err);
+        uiAlert('出貨沒過：' + (err && err.code ? err.code : (err && err.message) || '未知錯誤'), '上傳失敗');
+      }
+      spinner.style.display = 'none';
+    };
+  }
+
+  // ---------- OC 美術圖 ----------
+  // 跟頭貼庫同一套（圖 + 繪師 + 上下排序 + 刪除），只差集合是 ocArt、縮圖用 1600px（美術圖要看得清楚）
+  function initOcArt(){
+    const colRef = collection(db, 'ocArt');
+    const q = query(colRef, orderBy('order', 'asc'));
+
+    onSnapshot(q, (snap)=>{
+      const list = document.getElementById('ocartList');
+      if(snap.empty){ list.innerHTML = '<div class="empty">OC 美術圖還是空的</div>'; return; }
+      const docs = [];
+      snap.forEach(d=> docs.push({ id:d.id, ...d.data() }));
+
+      list.innerHTML = '';
+      docs.forEach((a, idx)=>{
+        const el = document.createElement('div');
+        el.className = 'avatar-item';
+        el.innerHTML = `
+          <img src="${a.imageUrl}" alt="">
+          <div class="ai-info">
+            <div class="ai-artist">${escapeHtml(a.artist || '（沒標繪師）')}</div>
+            <div class="ai-order">順序 ${idx + 1}</div>
+          </div>
+          <div class="ai-btns">
+            <button class="mini-btn" data-dir="up">▲</button>
+            <button class="mini-btn" data-dir="down">▼</button>
+          </div>
+          <button class="del-btn">✕</button>
+        `;
+        el.querySelector('[data-dir="up"]').addEventListener('click', ()=> swapOrder(docs, idx, idx-1));
+        el.querySelector('[data-dir="down"]').addEventListener('click', ()=> swapOrder(docs, idx, idx+1));
+        el.querySelector('.del-btn').addEventListener('click', async ()=>{
+          try{ if(a.storagePath) await deleteObject(ref(storage, a.storagePath)); }catch(e){}
+          await deleteDoc(doc(db,'ocArt', a.id));
+        });
+        list.appendChild(el);
+      });
+    });
+
+    async function swapOrder(docs, i, j){
+      if(j < 0 || j >= docs.length) return;
+      const a = docs[i], b = docs[j];
+      const orderA = a.order, orderB = b.order;
+      await setDoc(doc(db,'ocArt', a.id), { order: orderB }, { merge:true });
+      await setDoc(doc(db,'ocArt', b.id), { order: orderA }, { merge:true });
+    }
+
+    let selectedFile = null;
+    document.getElementById('ocartInput').addEventListener('change', (e)=>{
+      selectedFile = e.target.files[0] || null;
+      document.getElementById('ocartZoneText').textContent = selectedFile ? `挑了：${selectedFile.name}` : '🖼️ 點一下挑委託圖';
+    });
+
+    document.getElementById('ocartUploadBtn').onclick = async ()=>{
+      if(!selectedFile) return;
+      const spinner = document.getElementById('ocartSpinner');
+      spinner.style.display = 'block';
+      try{
+        const snap = await getDocs(query(colRef, orderBy('order','desc')));
+        let maxOrder = 0;
+        snap.forEach(d=>{ const o = d.data().order || 0; if(o > maxOrder) maxOrder = o; });
+
+        const thumb = await makeWebpThumb(selectedFile, 1600);
+        const upBlob = thumb ? thumb.blob : selectedFile;
+        const upExt  = thumb ? thumb.ext  : (selectedFile.name.split('.').pop() || 'img');
+        const upMeta = thumb ? { ...IMG_CACHE_META, contentType: thumb.type } : IMG_CACHE_META;
+
+        const path = `ocart/${Date.now()}_ocart.${upExt}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, upBlob, upMeta);
+        const url = await getDownloadURL(sRef);
+        await addDoc(colRef, {
+          imageUrl: url,
+          storagePath: path,
+          artist: document.getElementById('ocartArtist').value.trim(),
+          order: maxOrder + 1,
+          uploadedAt: serverTimestamp()
+        });
+        document.getElementById('ocartArtist').value = '';
+        document.getElementById('ocartInput').value = '';
+        document.getElementById('ocartZoneText').textContent = '🖼️ 點一下挑委託圖';
+        selectedFile = null;
+      }catch(err){
+        console.error(err);
+        uiAlert('出貨沒過：' + (err && err.code ? err.code : (err && err.message) || '未知錯誤'), '上傳失敗');
+      }
+      spinner.style.display = 'none';
+    };
+  }
+
+  // ---------- 照片牆 ----------
+  async function initGallery(){
+    const colRef = collection(db, 'gallery');
+    const albumsRef = collection(db, 'albums');
+    const { default: Sortable } = await import('https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/+esm');
+
+    let photos = [], albums = [], trashed = [];
+    // 相簿可以層層往下開：空陣列=主牆，最後一個元素=正在看的相簿
+    let albumPath = [];
+    const curAlbumId = ()=> albumPath.length ? albumPath[albumPath.length - 1] : null;
+    let draggingNow = false;
+    let pendingRender = false;
+    const sortables = [];
+
+    // 排序鍵：有手動 order 用 order；舊資料沒有就用 -上傳時間（新的在前，跟原本一致）
+    function effOrder(x){
+      if(typeof x.order === 'number') return x.order;
+      const t = x.uploadedAt && x.uploadedAt.toMillis ? x.uploadedAt.toMillis() : 0;
+      return -t;
+    }
+    const bySort = (a,b)=> effOrder(a) - effOrder(b);
+
+    function albumPhotos(id){ return photos.filter(p=> p.albumId === id).sort(bySort); }
+    function subAlbums(parentId){
+      return albums.filter(a=> (a.parentAlbumId || null) === (parentId || null)).sort(bySort);
+    }
+    // 封面：自己的照片優先，沒有就往子相簿借一張。depth 上限是防呆，資料萬一成環也不會卡死
+    function albumCover(al, depth){
+      const picked = photos.find(p=> p.id === al.coverPhotoId) || albumPhotos(al.id)[0];
+      if(picked) return picked;
+      if((depth || 0) >= 5) return null;
+      for(const sub of subAlbums(al.id)){
+        const c = albumCover(sub, (depth || 0) + 1);
+        if(c) return c;
+      }
+      return null;
+    }
+    // candidate 是不是 ancestor 的子孫？把相簿拖進自己的子孫會接成一個環，
+    // 那條分支就再也回不到主牆（資料孤島），所以搬動前一定要擋。
+    function isDescendant(candidateId, ancestorId){
+      let cur = albums.find(a=> a.id === candidateId);
+      let guard = 0;
+      while(cur && guard++ < 50){
+        const parent = cur.parentAlbumId || null;
+        if(!parent) return false;
+        if(parent === ancestorId) return true;
+        cur = albums.find(a=> a.id === parent);
+      }
+      return false;
+    }
+
+    // ---------- 相簿清單卡片 ----------
+    function renderAlbumList(){
+      const list = document.getElementById('albumList');
+      const sel = document.getElementById('photoAlbumSelect');
+      const kept = sel.value;
+
+      // 相簿是樹狀的，清單與下拉都用縮排把層級表現出來
+      const flat = [];
+      (function walk(parentId, depth){
+        if(depth > 20) return;
+        subAlbums(parentId).forEach(a=>{
+          flat.push({ al: a, depth });
+          walk(a.id, depth + 1);
+        });
+      })(null, 0);
+
+      sel.innerHTML = '<option value="">牆上散著就好</option>' +
+        flat.map(({al, depth})=> `<option value="${al.id}">${'　'.repeat(depth)}${escapeHtml(al.name)}</option>`).join('');
+      sel.value = kept && albums.some(a=> a.id === kept) ? kept : '';
+      if(!flat.length){ list.innerHTML = '<div class="empty">一個金庫都還沒有</div>'; return; }
+      list.innerHTML = '';
+      flat.forEach(({al, depth})=>{
+        const cover = albumCover(al);
+        const subCount = subAlbums(al.id).length;
+        const row = document.createElement('div');
+        row.className = 'album-row';
+        row.style.paddingLeft = (depth * 16) + 'px';
+        row.innerHTML = `
+          ${cover ? `<img src="${cover.imageUrl}" alt="">` : `<div class="placeholder-cover">📁</div>`}
+          <div class="info">
+            <div class="t">${depth ? '↳ ' : ''}${escapeHtml(al.name)}</div>
+            <div class="c">${albumPhotos(al.id).length} 張${subCount ? `・${subCount} 個子金庫` : ''}</div>
+          </div>
+          <button class="btn" data-act="share" title="複製這個金庫的分享連結">🔗</button>
+          <button class="btn" data-act="rename">改名</button>
+          <button class="btn" data-act="del" style="color:#e53935;">刪除</button>
+        `;
+        row.querySelector('[data-act="share"]').onclick = (e)=> copyShareLink('album', al.id, e.currentTarget);
+        row.querySelector('[data-act="rename"]').onclick = async ()=>{
+          const name = await uiPrompt('金庫叫什麼', al.name);
+          if(name && name.trim()) await setDoc(doc(db,'albums', al.id), { name: name.trim() }, { merge:true });
+        };
+        row.querySelector('[data-act="del"]').onclick = async ()=>{
+          const ok = await uiConfirm(`裡面的照片會回到牆上，子相簿往上提一層，都不會被刪除。`,
+            { title: `刪除相簿「${al.name}」？`, okLabel: '刪除相簿', danger: true });
+          if(!ok) return;
+          const batch = writeBatch(db);
+          albumPhotos(al.id).forEach(p=> batch.set(doc(db,'gallery', p.id), { albumId: null }, { merge:true }));
+          // 子相簿不能跟著消失，接到被刪相簿的父層去
+          const up = al.parentAlbumId || null;
+          subAlbums(al.id).forEach(s=> batch.set(doc(db,'albums', s.id), { parentAlbumId: up }, { merge:true }));
+          batch.delete(doc(db,'albums', al.id));
+          await batch.commit();
+          const at = albumPath.indexOf(al.id);
+          if(at >= 0) albumPath = albumPath.slice(0, at);
+        };
+        list.appendChild(row);
+      });
+    }
+
+    document.getElementById('createAlbumBtn').onclick = async ()=>{
+      const input = document.getElementById('newAlbumName');
+      const name = input.value.trim();
+      if(!name) return;
+      // 正在某個相簿裡就建成它的子相簿；在主牆就是最外層相簿
+      await addDoc(albumsRef, {
+        name,
+        coverPhotoId: null,
+        parentAlbumId: curAlbumId(),
+        order: -Date.now(),
+        createdAt: serverTimestamp()
+      });
+      input.value = '';
+    };
+
+    // ---------- 垃圾桶 ----------
+    // 刪照片是「軟刪除」：只在文件上蓋一個 deletedAt，檔案原封不動留著，所以復原是完整的。
+    // 代價是照片還佔著空間 —— 所以有「清空」按鈕，真正的刪除一律交給雲端函式 emptyTrash
+    // （刪檔規則「原檔在 R2 還是 Firebase」只有後端那一份實作，前端不再各自維護）。
+    let trashOpen = false;
+
+    function renderTrash(){
+      const title = document.getElementById('trashTitle');
+      const toggle = document.getElementById('trashToggle');
+      const emptyBtn = document.getElementById('trashEmptyBtn');
+      const wall = document.getElementById('trashWall');
+
+      title.textContent = trashed.length ? `🗑 垃圾桶（${trashed.length}）` : '🗑 垃圾桶';
+      toggle.textContent = trashOpen ? '收起' : '展開';
+      toggle.disabled = !trashed.length;
+      emptyBtn.style.display = trashed.length ? '' : 'none';
+      wall.style.display = trashOpen && trashed.length ? '' : 'none';
+      if(!trashOpen || !trashed.length){ wall.innerHTML = ''; return; }
+
+      // 快到期的排前面，先看到最急的
+      const list = trashed.slice().sort((a,b)=> (a.deletedAt||0) - (b.deletedAt||0));
+      wall.innerHTML = '';
+      for(const p of list){
+        const daysLeft = Math.max(0, 30 - Math.floor((Date.now() - p.deletedAt) / 86400000));
+        const el = document.createElement('div');
+        el.className = 'wtile';
+        el.innerHTML = `
+          <img src="${p.imageUrl}" alt="" style="opacity:.62;">
+          <button class="wdel" data-act="purge" title="立刻永久刪除這張">✕</button>
+          <button class="wdel" style="right:auto; left:6px;" data-act="restore" title="拿回牆上">↩</button>
+          <div class="aname">還有 ${daysLeft} 天</div>
+        `;
+        el.querySelector('[data-act="restore"]').onclick = async ()=>{
+          // 復原＝把章拿掉。albumId 與 order 從來沒動過，所以會回到原本的位置
+          await setDoc(doc(db,'gallery', p.id), { deletedAt: deleteField() }, { merge:true });
+        };
+        el.querySelector('[data-act="purge"]').onclick = async ()=>{
+          const ok = await uiConfirm('這張的縮圖與原始檔會立刻刪掉，之後無法復原。',
+            { title: '永久刪除？', okLabel: '永久刪除', danger: true });
+          if(!ok) return;
+          try{ await emptyTrash({ ids: [p.id] }); }
+          catch(err){ alert('永久刪除失敗：' + ((err && err.message) || err)); }
+        };
+        wall.appendChild(el);
+      }
+    }
+
+    document.getElementById('trashToggle').onclick = ()=>{
+      trashOpen = !trashOpen;
+      renderTrash();
+    };
+
+    document.getElementById('trashEmptyBtn').onclick = async ()=>{
+      const n = trashed.length;
+      const ok = await uiConfirm(`${n} 張照片的縮圖與原始檔都會立刻刪掉，之後無法復原。`,
+        { title: '清空垃圾桶？', okLabel: '全部永久刪除', danger: true });
+      if(!ok) return;
+      const btn = document.getElementById('trashEmptyBtn');
+      btn.disabled = true;
+      btn.textContent = '清理中…';
+      try{
+        const r = (await emptyTrash({})).data;
+        btn.textContent = '清空';
+        alert(r.fileErrors
+          ? `清掉 ${r.purged} 張，有 ${r.fileErrors} 個檔案刪不掉（可能早就不在了，資料已清除）`
+          : `清掉 ${r.purged} 張，地盤空出來了 ✓`);
+      }catch(err){
+        btn.textContent = '清空';
+        alert('清空失敗：' + ((err && err.message) || err));
+      }
+      btn.disabled = false;
+    };
+
+    // ---------- 牆面排場編輯器 ----------
+    function makePhotoTile(p, inAlbum){
+      const el = document.createElement('div');
+      el.className = 'wtile';
+      el.dataset.kind = 'photo';
+      el.dataset.id = p.id;
+      // 原檔放在哪個雲。originalStore === 'r2' 才是 R2；沒有這個欄位就還在 Firebase
+      // （舊資料，或雲端轉檔剛傳完、還沒被每月的 migrateOriginals 搬走）
+      const onR2 = p.originalStore === 'r2';
+      const cloud = p.originalUrl
+        ? `<span class="wcloud ${onR2 ? 'r2' : 'fb'}" title="${onR2
+            ? '原檔在 Cloudflare R2（下載流量免費）'
+            : '原檔還在 Firebase，月底會自動搬去 R2'}">${onR2 ? 'R2' : 'FB'}</span>`
+        : '';
+      el.innerHTML = `
+        <img src="${p.imageUrl}" alt="">
+        ${cloud}
+        <button class="wdel" title="刪除照片">✕</button>
+        <button class="wpano${p.pano ? ' on' : ''}" data-act="pano"
+                title="標記成 360 全景照（前台會用球面檢視器打開）">◎ 360</button>
+        <button class="wpano whdr${p.hdr ? ' on' : ''}" data-act="hdr"
+                title="標記成 HDR（燈箱會載入保有 gain map 的原始檔）">HDR</button>
+        <button class="wshare" data-act="share"
+                title="複製這張的專屬連結。誰點開都直接看到這一張，原檔畫質，不經過聊天軟體壓縮">🔗</button>
+        ${inAlbum ? `
+          <button class="wdel" style="right:auto; left:6px;" data-act="out" title="放回牆上">⬆</button>
+          <button class="wdel" style="right:auto; left:50%; margin-left:-12px;" data-act="cover" title="立為門面">☆</button>
+        ` : ''}
+      `;
+      // 360 開關：只寫一個 pano 欄位，前台看到 true 就改用球面檢視器。
+      // 這裡不做自動偵測（寬高比 2:1 的一般寬景照會被誤判成全景，看起來會很扭曲）
+      el.querySelector('[data-act="pano"]').onclick = async (e)=>{
+        e.stopPropagation();
+        const next = !p.pano;
+        e.currentTarget.classList.toggle('on', next);
+        try{
+          await setDoc(doc(db,'gallery', p.id), { pano: next }, { merge:true });
+        }catch(err){
+          e.currentTarget.classList.toggle('on', !next);
+          alert('標記失敗：' + (err && err.message ? err.message : err));
+        }
+      };
+      // HDR：標記後前台燈箱會改載原始檔（縮圖的 WebP 沒有 gain map，永遠是 SDR）
+      el.querySelector('[data-act="hdr"]').onclick = async (e)=>{
+        e.stopPropagation();
+        const next = !p.hdr;
+        e.currentTarget.classList.toggle('on', next);
+        try{
+          await setDoc(doc(db,'gallery', p.id), { hdr: next }, { merge:true });
+        }catch(err){
+          e.currentTarget.classList.toggle('on', !next);
+          alert('標記失敗：' + (err && err.message ? err.message : err));
+        }
+      };
+      el.querySelector('[data-act="share"]').onclick = (e)=>{
+        e.stopPropagation();
+        copyShareLink('photo', p.id, e.currentTarget);
+      };
+      el.querySelector('.wdel:not([data-act])').onclick = async (e)=>{
+        e.stopPropagation();
+        const ok = await uiConfirm('會移到垃圾桶，30 天內都能復原。',
+          { title: '刪除這張照片？', okLabel: '移到垃圾桶', danger: true });
+        if(!ok) return;
+        // 軟刪除：只蓋上刪除時間，檔案原封不動留著（復原才會是完整的）。
+        // 用 Date.now() 而不是 serverTimestamp()：後者在伺服器回應前本機讀到 null，
+        // 照片會有一瞬間還留在牆上才消失
+        await setDoc(doc(db,'gallery', p.id), { deletedAt: Date.now() }, { merge:true });
+      };
+      if(inAlbum){
+        el.querySelector('[data-act="out"]').onclick = async (e)=>{
+          e.stopPropagation();
+          await setDoc(doc(db,'gallery', p.id), { albumId: null, order: -Date.now() }, { merge:true });
+        };
+        el.querySelector('[data-act="cover"]').onclick = async (e)=>{
+          e.stopPropagation();
+          await setDoc(doc(db,'albums', curAlbumId()), { coverPhotoId: p.id }, { merge:true });
+        };
+      }
+      return el;
+    }
+
+    function makeAlbumTile(al, inAlbum){
+      const el = document.createElement('div');
+      el.className = 'wtile album-tile';
+      el.dataset.kind = 'album';
+      el.dataset.id = al.id;
+      const cover = albumCover(al);
+      const subCount = subAlbums(al.id).length;
+      el.innerHTML = `
+        <div class="astack"></div>
+        ${cover ? `<img src="${cover.imageUrl}" alt="">` : `<div class="placeholder-cover">📁</div>`}
+        ${inAlbum ? `<button class="wdel" style="right:auto; left:6px;" data-act="albumout" title="移出這個金庫">⬆</button>` : ''}
+        <button class="wshare" data-act="share"
+                title="複製這個金庫的專屬連結。點開就是整本相簿，不會先經過主頁">🔗</button>
+        <div class="aname">${escapeHtml(al.name)}（${albumPhotos(al.id).length}${subCount ? ` ・📁${subCount}` : ''}）</div>
+      `;
+      el.querySelector('[data-act="share"]').onclick = (e)=>{
+        e.stopPropagation();
+        copyShareLink('album', al.id, e.currentTarget);
+      };
+      if(inAlbum){
+        // 往上提一層：接到目前這層的父相簿（已經在第一層就回到主牆）
+        el.querySelector('[data-act="albumout"]').onclick = async (e)=>{
+          e.stopPropagation();
+          const up = albumPath.length >= 2 ? albumPath[albumPath.length - 2] : null;
+          await setDoc(doc(db,'albums', al.id), { parentAlbumId: up, order: -Date.now() }, { merge:true });
+        };
+      }
+      el.addEventListener('click', ()=>{ albumPath.push(al.id); renderWall(); });
+      return el;
+    }
+
+    function destroySortables(){ while(sortables.length){ try{ sortables.pop().destroy(); }catch(err){} } }
+
+    // 這個東西能不能收進那個相簿方塊？照片一律可以；相簿不能收進自己、也不能收進自己的子孫
+    function canNest(draggedEl, targetEl){
+      if(!draggedEl || !targetEl) return false;
+      const draggedId = draggedEl.dataset.id;
+      const targetId = targetEl.dataset.id;
+      if(!draggedId || !targetId || draggedId === targetId) return false;
+      if(draggedEl.dataset.kind === 'photo') return true;
+      return !isDescendant(targetId, draggedId);
+    }
+
+    async function persistOrder(container){
+      // 依 DOM 目前順序，整批重寫 order（每格間隔 10）
+      const batch = writeBatch(db);
+      [...container.children].forEach((el, i)=>{
+        if(!el.dataset || !el.dataset.id) return;
+        const coll = el.dataset.kind === 'album' ? 'albums' : 'gallery';
+        batch.set(doc(db, coll, el.dataset.id), { order: i * 10 }, { merge:true });
+      });
+      await batch.commit();
+    }
+
+    function renderWall(){
+      if(draggingNow){ pendingRender = true; return; }
+      destroySortables();
+      const wall = document.getElementById('wallEditor');
+      wall.innerHTML = '';
+
+      // 路徑上的相簿若在別的裝置被刪掉，往上退到還存在的那一層
+      albumPath = albumPath.filter(id=> albums.some(a=> a.id === id));
+      const cur = curAlbumId();
+      let merged;
+
+      if(cur !== null){
+        const head = document.createElement('div');
+        head.className = 'wall-head';
+        const crumbs = albumPath.map((id, i)=>{
+          const nm = (albums.find(a=> a.id === id) || {}).name || '';
+          return `<span class="crumb" data-depth="${i + 1}" style="cursor:pointer; text-decoration:underline;">${escapeHtml(nm)}</span>`;
+        }).join(' › ');
+        head.innerHTML = `<button class="btn" id="albumBackBtn" style="width:auto; padding:6px 12px;">← 返回</button>` +
+          `<b style="font-size:13.5px;"><span class="crumb" data-depth="0" style="cursor:pointer; text-decoration:underline;">牆面</span> › ${crumbs}</b>` +
+          `<span style="font-size:11px; color:var(--muted);">☆ 立門面　⬆ 移出　·　在這裡開的相簿會變成子金庫</span>`;
+        wall.appendChild(head);
+        head.querySelector('#albumBackBtn').onclick = ()=>{ albumPath.pop(); renderWall(); };
+        // 點麵包屑直接跳到那一層，不用一層一層退
+        head.querySelectorAll('.crumb').forEach(c=>{
+          c.onclick = ()=>{ albumPath = albumPath.slice(0, parseInt(c.dataset.depth, 10)); renderWall(); };
+        });
+
+        merged = [
+          ...subAlbums(cur).map(a=> ({ kind:'album', it:a })),
+          ...albumPhotos(cur).map(p=> ({ kind:'photo', it:p }))
+        ].sort((a,b)=> effOrder(a.it) - effOrder(b.it));
+
+        if(!merged.length){
+          const empty = document.createElement('div');
+          empty.className = 'empty'; empty.style.columnSpan = 'all';
+          empty.textContent = '這個金庫還空著：把外面的照片或相簿拖到它上面，或出貨時直接指定這裡';
+          wall.appendChild(empty);
+          return;
+        }
+      }else{
+        // 主牆：零散照片 + 最外層相簿混排（子相簿要點進父相簿才看得到）
+        merged = [
+          ...photos.filter(p=> !p.albumId).map(p=> ({ kind:'photo', it:p })),
+          ...subAlbums(null).map(a=> ({ kind:'album', it:a }))
+        ].sort((a,b)=> effOrder(a.it) - effOrder(b.it));
+
+        if(!merged.length){ wall.innerHTML = '<div class="empty">這裡還沒有貨</div>'; return; }
+      }
+
+      merged.forEach(m=> wall.appendChild(
+        m.kind === 'album' ? makeAlbumTile(m.it, cur !== null) : makePhotoTile(m.it, cur !== null)
+      ));
+
+      let lastXY = null;
+      const trackXY = (e)=>{
+        const t = e.touches ? e.touches[0] : e;
+        lastXY = { x: t.clientX, y: t.clientY };
+      };
+      sortables.push(new Sortable(wall, {
+        animation:220, easing:'cubic-bezier(0.32, 0.72, 0, 1)',
+        delay:200, delayOnTouchOnly:true, draggable:'.wtile',
+        ghostClass:'dragging', chosenClass:'lifted',
+        forceFallback:true, fallbackOnBody:true, touchStartThreshold:8, fallbackTolerance:3,
+        // 預設要蓋過整格才交換，手感很鈍；0.6 = 碰到六成就讓位，接近手機的即時感
+        swapThreshold:0.6,
+        onStart:()=>{
+          draggingNow = true;
+          window.addEventListener('pointermove', trackXY, {passive:true});
+          window.addEventListener('touchmove', trackXY, {passive:true});
+        },
+        onMove:(evt, oe)=>{
+          wall.querySelectorAll('.drop-target').forEach(x=> x.classList.remove('drop-target'));
+          const rel = evt.related;
+          if(rel && rel.classList.contains('album-tile') && canNest(evt.dragged, rel)){
+            // 命中相簿的中心區域＝要收進去：高亮、且回傳 false 讓相簿不被推移；
+            // 命中邊緣＝想把它排在相簿旁邊：照常允許插入
+            const r = rel.getBoundingClientRect();
+            const t = oe && (oe.touches ? oe.touches[0] : oe);
+            if(t){
+              const mx = (t.clientX - r.left) / r.width;
+              const my = (t.clientY - r.top) / r.height;
+              if(mx > 0.18 && mx < 0.82 && my > 0.18 && my < 0.82){
+                rel.classList.add('drop-target');
+                return false;
+              }
+            }
+          }
+          return true;
+        },
+        onEnd: async (evt)=>{
+          draggingNow = false;
+          window.removeEventListener('pointermove', trackXY);
+          window.removeEventListener('touchmove', trackXY);
+          let target = wall.querySelector('.drop-target');
+          if(!target && lastXY){
+            // 跟著手指/滑鼠的拖影蓋在最上層，不先藏起來的話 elementFromPoint
+            // 只會問到拖影自己，偵測不到底下的相簿
+            const ghost = document.querySelector('.sortable-fallback');
+            const prevDisplay = ghost ? ghost.style.display : null;
+            if(ghost) ghost.style.display = 'none';
+            const under = document.elementFromPoint(lastXY.x, lastXY.y);
+            if(ghost) ghost.style.display = prevDisplay || '';
+
+            const hit = under && under.closest('.album-tile');
+            if(hit && canNest(evt.item, hit)) target = hit;
+          }
+          wall.querySelectorAll('.drop-target').forEach(x=> x.classList.remove('drop-target'));
+          lastXY = null;
+          if(target && canNest(evt.item, target)){
+            if(evt.item.dataset.kind === 'photo'){
+              await setDoc(doc(db,'gallery', evt.item.dataset.id), { albumId: target.dataset.id, order: -Date.now() }, { merge:true });
+            }else{
+              // 相簿收進相簿＝變成它的子相簿
+              await setDoc(doc(db,'albums', evt.item.dataset.id), { parentAlbumId: target.dataset.id, order: -Date.now() }, { merge:true });
+            }
+          }else{
+            await persistOrder(wall);
+          }
+          if(pendingRender){ pendingRender = false; renderWall(); }
+        }
+      }));
+    }
+
+    onSnapshot(query(colRef, orderBy('uploadedAt', 'desc')), (snap)=>{
+      photos = [];
+      trashed = [];
+      // deletedAt 有值＝在垃圾桶裡。刻意在拿到資料後才分流，不用 Firestore 的 where ——
+      // where('deletedAt','==',null) 抓不到「根本沒有這個欄位」的舊資料，整面牆會空掉
+      snap.forEach(d=>{
+        const p = { id:d.id, ...d.data() };
+        (p.deletedAt ? trashed : photos).push(p);
+      });
+      renderAlbumList();
+      renderWall();
+      renderTrash();
+    });
+    onSnapshot(albumsRef, (snap)=>{
+      albums = [];
+      snap.forEach(d=> albums.push({ id:d.id, ...d.data() }));
+      renderAlbumList();
+      renderWall();
+    });
+
+    let selectedFiles = [];
+    const photoInput = document.getElementById('photoInput');
+    const uploadZoneText = document.getElementById('uploadZoneText');
+    const progressEl = document.getElementById('uploadProgress');
+
+    photoInput.addEventListener('change', (e)=>{
+      selectedFiles = [...(e.target.files || [])];
+      uploadZoneText.textContent = selectedFiles.length
+        ? `點了 ${selectedFiles.length} 張：${selectedFiles.map(f=>f.name).join('、')}`
+        : '📷 點一下挑照片（一次多張沒問題，也可以直接把檔案拖進來）';
+    });
+
+    // 拖放上傳：把圖片檔拖到上傳區即可，效果等同用選擇器挑檔
+    const dropZone = document.getElementById('uploadZone');
+    ['dragenter','dragover'].forEach(ev=>
+      dropZone.addEventListener(ev, (e)=>{ e.preventDefault(); dropZone.classList.add('dragover'); })
+    );
+    ['dragleave','dragend'].forEach(ev=>
+      dropZone.addEventListener(ev, (e)=>{ e.preventDefault(); dropZone.classList.remove('dragover'); })
+    );
+    dropZone.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const dropped = [...(e.dataTransfer.files || [])].filter(f=>
+        f.type.startsWith('image/') || /\.tiff?$/i.test(f.name)
+      );
+      if(!dropped.length) return;
+      selectedFiles = dropped;
+      uploadZoneText.textContent = `點了 ${selectedFiles.length} 張：${selectedFiles.map(f=>f.name).join('、')}`;
+    });
+
+    document.getElementById('uploadBtn').onclick = async ()=>{
+      if(!selectedFiles.length) return;
+      const files = selectedFiles;
+      const caption = document.getElementById('photoCaption').value.trim();
+      const uploadAlbumId = document.getElementById('photoAlbumSelect').value || null;
+      // 整批共用的標記。只在勾了的時候才寫欄位 —— 一律寫 false 會讓每筆文件多兩個沒用的欄位，
+      // 而且前台判斷的是「有沒有值」，沒有欄位跟 false 是同一個意思
+      const flagPano = document.getElementById('uploadPano').checked;
+      const flagHdr = document.getElementById('uploadHdr').checked;
+      const uploadFlags = { ...(flagPano ? { pano: true } : {}), ...(flagHdr ? { hdr: true } : {}) };
+      const uploadMode = document.getElementById('uploadMode').value; // 'local'（R2/本地轉檔）｜'cloud'（Firebase/雲端轉檔）
+      // 立刻釋放選擇器，可馬上選下一批
+      selectedFiles = [];
+      photoInput.value = '';
+      uploadZoneText.textContent = '📷 點一下挑照片（一次多張沒問題，也可以直接把檔案拖進來）';
+      document.getElementById('photoCaption').value = '';
+
+      progressEl.style.display = 'block';
+      const lines = files.map(f=> `⏳ ${f.name}：排隊等出貨`);
+      const renderProgress = ()=> progressEl.innerHTML = lines.map(l=> escapeHtml(l)).join('<br>');
+      renderProgress();
+
+      // 一次跑 3 張。兩種上傳方式（uploadMode）：
+      //  local ＝「R2 ／本地轉檔」：這台電腦當場轉縮圖 → 縮圖進 Firebase、原檔直接進 R2（要短效通行證），此頁自己寫資料庫。
+      //  cloud ＝「Firebase ／雲端轉檔」：不轉檔、只把原檔丟進 Firebase 的 gallery/orig/，
+      //          由雲端函式 transcodeGalleryUpload 接手轉縮圖＋寫資料庫（省電，給沒電／大檔情境）。
+      const CONCURRENCY = 3;
+      async function processOne(i){
+        const file = files[i];
+        let step = '換通行證';
+        const ts = Date.now() + i; // 防同毫秒撞檔名（縮圖檔名用；原檔檔名由後端配發）
+
+        // ── Firebase ／雲端轉檔：這裡不轉檔，只把原檔丟進 gallery/orig/，雲端函式接手轉縮圖＋寫資料庫 ──
+        if(uploadMode === 'cloud'){
+          step = '押原檔';
+          try{
+            lines[i] = `🔄 ${file.name}：原檔押上去（雲端轉檔）…`; renderProgress();
+            const rand = Math.random().toString(36).slice(2, 6);
+            const origRef = ref(storage, `gallery/orig/${ts}_${rand}_${file.name}`);
+            // customMetadata 帶上雲端函式需要的資訊：cloudTranscode 標記＋圖說／相簿／排序／原檔名
+            await uploadBytes(origRef, file, {
+              contentType: file.type || 'application/octet-stream',
+              contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+              ...IMG_CACHE_META,
+              customMetadata: {
+                cloudTranscode: '1',
+                caption,
+                albumId: uploadAlbumId || '',
+                order: String(-Date.now()),
+                originalName: file.name,
+                // 自訂中繼資料只吃字串，所以旗標用 '1'／不放；雲端函式那邊照這個規則解讀
+                ...(flagPano ? { pano: '1' } : {}),
+                ...(flagHdr ? { hdr: '1' } : {}),
+              },
+            });
+            lines[i] = `✅ ${file.name}：貨到了，雲端還在轉檔，等等自己會上牆`; renderProgress();
+          }catch(err){
+            console.error(`雲端轉檔沒過（${file.name}）`, err);
+            lines[i] = `❌ ${file.name}：「${step}」這關沒過（${err && err.code ? err.code : (err && err.message) || '未知錯誤'}）`;
+            renderProgress();
+          }
+          return;
+        }
+
+        // ── 以下為 R2 ／本地轉檔（預設，原本流程不變）──
+        try{
+          lines[i] = `🔄 ${file.name}：整裝中…`; renderProgress();
+          const ticket = (await r2UploadTicket({
+            fileName: file.name,
+            contentType: file.type || 'application/octet-stream'
+          })).data;
+
+          step = '押原檔＋轉檔';
+          lines[i] = `🔄 ${file.name}：押原檔＋轉 WebP 中…`; renderProgress();
+          const [putRes, thumb] = await Promise.all([
+            // 附件與快取標頭由通行證一起帶回，要原樣送出
+            fetch(ticket.uploadUrl, { method: 'PUT', body: file, headers: ticket.headers }),
+            makeWebpThumb(file, 1600)
+          ]);
+          if(!putRes.ok) throw new Error(`R2 回應 ${putRes.status}`);
+          if(!thumb){
+            // 轉不出縮圖就不發布，並清掉已上傳到 R2 的原檔
+            try{ await r2Delete({ key: ticket.key }); }catch(e){}
+            lines[i] = `❌ ${file.name}：這個格式吃不動，沒上牆（確認檔案沒壞，或回報我補上這個格式）`;
+            renderProgress();
+            return;
+          }
+
+          step = '縮圖跟上';
+          lines[i] = `🔄 ${file.name}：縮圖跟上中…`; renderProgress();
+          const thumbPath = `gallery/thumbs/${ts}_thumb.${thumb.ext}`;
+          const thumbRef = ref(storage, thumbPath);
+          await uploadBytes(thumbRef, thumb.blob, { ...IMG_CACHE_META, contentType: thumb.type });
+          const thumbUrl = await getDownloadURL(thumbRef);
+
+          step = '登記入帳';
+          lines[i] = `🔄 ${file.name}：登記入帳中…`; renderProgress();
+          await addDoc(colRef, {
+            imageUrl: thumbUrl,           // 顯示用縮圖（Firebase）
+            storagePath: thumbPath,
+            originalUrl: ticket.publicUrl, // 下載用原檔（R2 公開網址）
+            originalPath: ticket.key,      // R2 上的物件路徑
+            originalStore: 'r2',           // 原檔存放處。沒有這欄位 = 還在 Firebase 的舊資料
+            originalName: file.name,
+            caption,
+            albumId: uploadAlbumId,
+            order: -Date.now(),
+            uploadedAt: serverTimestamp(),
+            ...uploadFlags
+          });
+          lines[i] = `✅ ${file.name}：到位`; renderProgress();
+        }catch(err){
+          console.error(`這批沒過（${file.name}，卡在「${step}」）`, err);
+          // 標出失敗步驟與錯誤碼
+          lines[i] = `❌ ${file.name}：「${step}」這關沒過（${err && err.code ? err.code : (err && err.message) || '未知錯誤'}）`;
+          renderProgress();
+        }
+      }
+
+      let cursor = 0;
+      const workers = [];
+      for(let w = 0; w < Math.min(CONCURRENCY, files.length); w++){
+        workers.push((async ()=>{
+          while(cursor < files.length){
+            const i = cursor++;
+            await processOne(i);
+          }
+        })());
+      }
+      await Promise.all(workers);
+    };
+  }
+
+  // ---------- Fursona 設定圖 ----------
+  function initFursonas(){
+    const colRef = collection(db, 'fursonas');
+    const q = query(colRef, orderBy('order', 'asc'));
+
+    onSnapshot(q, (snap)=>{
+      const list = document.getElementById('fursonaList');
+      if(snap.empty){ list.innerHTML = '<div class="empty">設定圖還一張都沒有</div>'; return; }
+      const docs = [];
+      snap.forEach(d=> docs.push({ id:d.id, ...d.data() }));
+
+      list.innerHTML = '';
+      docs.forEach((f, idx)=>{
+        const el = document.createElement('div');
+        el.className = 'fursona-item';
+        el.innerHTML = `
+          <img src="${f.imageUrl}" alt="">
+          <div class="fi-info">
+            <div class="fi-label">${escapeHtml(f.label || (idx===0 ? '元老那張' : '（還沒取名）'))}</div>
+            <div class="fi-order">順序 ${idx + 1}</div>
+          </div>
+          <button class="btn" data-act="share" style="width:auto; padding:5px 10px;"
+                  title="複製這張設定圖的分享連結">🔗</button>
+          <button class="del-btn">✕</button>
+        `;
+        el.querySelector('[data-act="share"]').onclick = (e)=> copyShareLink('ref', f.id, e.currentTarget);
+        el.querySelector('.del-btn').addEventListener('click', async ()=>{
+          try{ if(f.storagePath) await deleteObject(ref(storage, f.storagePath)); }catch(e){}
+          await deleteDoc(doc(db,'fursonas', f.id));
+        });
+        list.appendChild(el);
+      });
+    });
+
+    let selectedFursonaFile = null;
+    document.getElementById('fursonaInput').addEventListener('change', (e)=>{
+      selectedFursonaFile = e.target.files[0] || null;
+      document.getElementById('fursonaZoneText').textContent = selectedFursonaFile ? `挑了：${selectedFursonaFile.name}` : '🎨 點一下挑設定圖';
+    });
+
+    document.getElementById('fursonaUploadBtn').onclick = async ()=>{
+      if(!selectedFursonaFile) return;
+      const spinner = document.getElementById('fursonaSpinner');
+      spinner.style.display = 'block';
+      try{
+        const snap = await getDocs(query(colRef, orderBy('order','desc')));
+        let maxOrder = 0;
+        snap.forEach(d=>{ const o = d.data().order || 0; if(o > maxOrder) maxOrder = o; });
+
+        const path = `fursonas/${Date.now()}_${selectedFursonaFile.name}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, selectedFursonaFile, IMG_CACHE_META);
+        const url = await getDownloadURL(sRef);
+        await addDoc(colRef, {
+          imageUrl: url,
+          storagePath: path,
+          label: document.getElementById('fursonaLabel').value.trim(),
+          order: maxOrder + 1,
+          uploadedAt: serverTimestamp()
+        });
+        document.getElementById('fursonaLabel').value = '';
+        document.getElementById('fursonaInput').value = '';
+        document.getElementById('fursonaZoneText').textContent = '🎨 點一下挑設定圖';
+        selectedFursonaFile = null;
+      }catch(err){
+        console.error(err);
+        uiAlert('出貨沒過：' + (err && err.code ? err.code : (err && err.message) || '未知錯誤'), '上傳失敗');
+      }
+      spinner.style.display = 'none';
+    };
+  }
+
+  // ---------- 彩蛋設定 ----------
+  function initEggSettings(){
+    const settingsRef = doc(db, 'settings', 'easterEgg');
+
+    getDoc(settingsRef).then(snap=>{
+      const data = snap.exists() ? snap.data() : {};
+      renderEggPreview(data);
+      document.getElementById('stage2UrlInput').value = data.stage2Url || 'https://youtu.be/dQw4w9WgXcQ?si=Ba_6rd1HG80EjtXY';
+    });
+
+    function renderEggPreview(data){
+      const avatarPreview = document.getElementById('eggAvatarPreview');
+      avatarPreview.innerHTML = data.stage1AvatarUrl
+        ? `<img class="preview-thumb" src="${data.stage1AvatarUrl}" alt="">`
+        : `<span style="font-size:11.5px; color:var(--muted);">現在掛的是預設那張</span>`;
+
+      const soundPreview = document.getElementById('eggSoundPreview');
+      soundPreview.innerHTML = data.stage1SoundUrl
+        ? `<audio class="preview-audio" controls src="${data.stage1SoundUrl}"></audio>`
+        : `<span style="font-size:11.5px; color:var(--muted);">現在放的是預設音效</span>`;
+    }
+
+    let selectedEggAvatar = null;
+    document.getElementById('eggAvatarInput').addEventListener('change', (e)=>{
+      selectedEggAvatar = e.target.files[0] || null;
+      document.getElementById('eggAvatarZoneText').textContent = selectedEggAvatar ? `挑了：${selectedEggAvatar.name}` : '🖼️ 換一張機關頭貼';
+    });
+    document.getElementById('eggAvatarSaveBtn').onclick = async ()=>{
+      if(!selectedEggAvatar) return;
+      const spinner = document.getElementById('eggAvatarSpinner');
+      spinner.style.display = 'block';
+      try{
+        const thumb = await makeWebpThumb(selectedEggAvatar, 512);
+        const upBlob = thumb ? thumb.blob : selectedEggAvatar;
+        const upExt  = thumb ? thumb.ext  : (selectedEggAvatar.name.split('.').pop() || 'img');
+        const upMeta = thumb ? { ...IMG_CACHE_META, contentType: thumb.type } : IMG_CACHE_META;
+        const path = `egg/avatar_${Date.now()}.${upExt}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, upBlob, upMeta);
+        const url = await getDownloadURL(sRef);
+        await setDoc(settingsRef, { stage1AvatarUrl: url, updatedAt: serverTimestamp() }, { merge:true });
+        const snap = await getDoc(settingsRef);
+        renderEggPreview(snap.data());
+        document.getElementById('eggAvatarInput').value = '';
+        document.getElementById('eggAvatarZoneText').textContent = '🖼️ 換一張機關頭貼';
+        selectedEggAvatar = null;
+      }catch(err){
+        console.error(err);
+        uiAlert('出貨沒過：' + (err && err.code ? err.code : (err && err.message) || '未知錯誤'), '上傳失敗');
+      }
+      spinner.style.display = 'none';
+    };
+
+    let selectedEggSound = null;
+    document.getElementById('eggSoundInput').addEventListener('change', (e)=>{
+      selectedEggSound = e.target.files[0] || null;
+      document.getElementById('eggSoundZoneText').textContent = selectedEggSound ? `挑了：${selectedEggSound.name}` : '🔊 換一段音效';
+    });
+    document.getElementById('eggSoundSaveBtn').onclick = async ()=>{
+      if(!selectedEggSound) return;
+      const spinner = document.getElementById('eggSoundSpinner');
+      spinner.style.display = 'block';
+      try{
+        const path = `egg/sound_${Date.now()}_${selectedEggSound.name}`;
+        const sRef = ref(storage, path);
+        await uploadBytes(sRef, selectedEggSound, IMG_CACHE_META);
+        const url = await getDownloadURL(sRef);
+        await setDoc(settingsRef, { stage1SoundUrl: url, updatedAt: serverTimestamp() }, { merge:true });
+        const snap = await getDoc(settingsRef);
+        renderEggPreview(snap.data());
+        document.getElementById('eggSoundInput').value = '';
+        document.getElementById('eggSoundZoneText').textContent = '🔊 換一段音效';
+        selectedEggSound = null;
+      }catch(err){
+        console.error(err);
+        uiAlert('出貨沒過：' + (err && err.code ? err.code : (err && err.message) || '未知錯誤'), '上傳失敗');
+      }
+      spinner.style.display = 'none';
+    };
+
+    document.getElementById('stage2UrlSaveBtn').onclick = async ()=>{
+      const url = document.getElementById('stage2UrlInput').value.trim();
+      if(!url) return;
+      await setDoc(settingsRef, { stage2Url: url, updatedAt: serverTimestamp() }, { merge:true });
+      const status = document.getElementById('stage2UrlStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+  }
+
+  // ---------- 關於我彈出視窗文字 ----------
+  function initAboutModals(){
+    const ref2 = doc(db, 'settings', 'aboutModals');
+    getDoc(ref2).then(snap=>{
+      const d = snap.exists() ? snap.data() : {};
+      document.getElementById('musicTitleInput').value = d.musicTitle || '';
+      document.getElementById('musicDescInput').value = d.musicDesc || '';
+      document.getElementById('musicUrlInput').value = d.musicUrl || '';
+      document.getElementById('photoTitleInput').value = d.photoTitle || '';
+      document.getElementById('photoDescInput').value = d.photoDesc || '';
+      document.getElementById('photoUrlInput').value = d.photoUrl || '';
+    });
+
+    document.getElementById('musicSaveBtn').onclick = async ()=>{
+      await setDoc(ref2, {
+        musicTitle: document.getElementById('musicTitleInput').value.trim(),
+        musicDesc: document.getElementById('musicDescInput').value.trim(),
+        musicUrl: document.getElementById('musicUrlInput').value.trim(),
+        updatedAt: serverTimestamp()
+      }, { merge:true });
+      const status = document.getElementById('musicStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+
+    document.getElementById('photoSaveBtn').onclick = async ()=>{
+      await setDoc(ref2, {
+        photoTitle: document.getElementById('photoTitleInput').value.trim(),
+        photoDesc: document.getElementById('photoDescInput').value.trim(),
+        photoUrl: document.getElementById('photoUrlInput').value.trim(),
+        updatedAt: serverTimestamp()
+      }, { merge:true });
+      const status = document.getElementById('photoStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+  }
+
+  // ---------- 雲端流量計 ----------
+  // 數字全部來自 usageReport 這支雲端函式（Google Cloud Monitoring ＋ 列兩邊 bucket），
+  // 這裡只負責排版，刻意不做任何自己的估算——三個端（網站／手機／桌面）才會顯示同一份數字。
+  function fmtBytes(n){
+    n = Number(n || 0);
+    if(n < 1024) return n + ' B';
+    const units = ['KB','MB','GB','TB'];
+    let i = -1;
+    do { n /= 1024; i++; } while(n >= 1024 && i < units.length - 1);
+    return (n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : Math.round(n)) + ' ' + units[i];
+  }
+  // 「10000000」在小螢幕上讀不出是幾位數，用中文的萬／億好讀
+  function fmtCount(n){
+    n = Number(n || 0);
+    if(n >= 1e8) return (n / 1e8).toFixed(n % 1e8 ? 1 : 0) + ' 億';
+    if(n >= 1e4) return (n / 1e4).toFixed(n % 1e4 ? 1 : 0) + ' 萬';
+    return n.toLocaleString('en-US');
+  }
+  // 一條進度條。75% 轉橘、滿了轉紅——不必去看數字就知道該注意了
+  function meterRow(label, used, limit, fmt){
+    const ratio = limit > 0 ? used / limit : 0;
+    const cls = ratio >= 1 ? ' over' : ratio >= 0.75 ? ' warn' : '';
+    const pct = ratio >= 0.001 || ratio === 0 ? (ratio * 100).toFixed(ratio < 0.1 ? 1 : 0) : '<0.1';
+    return `<div class="meter${cls}">
+        <div class="top"><b>${label}</b><span>${fmt(used)} / ${fmt(limit)}　${pct}%</span></div>
+        <div class="bar"><div class="fill" style="width:${Math.min(100, ratio * 100).toFixed(2)}%"></div></div>
+      </div>`;
+  }
+
+  let usageLoaded = false;
+  let usageBusy = false;
+
+  async function loadUsage(force){
+    if(usageBusy) return;
+    if(usageLoaded && !force) return;   // 進出「設定」分頁不該每次都重算
+    usageBusy = true;
+    const body = document.getElementById('usageBody');
+    const btn = document.getElementById('usageRefresh');
+    btn.disabled = true;
+    if(!usageLoaded) body.innerHTML = '<div class="spinner">翻帳本中…</div>';
+    else body.style.opacity = '.45';
+    try{
+      const r = (await usageReport({ force: !!force })).data;
+      usageLoaded = true;
+      renderUsage(r);
+    }catch(err){
+      body.innerHTML = `<div class="spinner">帳本翻不開：${escapeHtml((err && err.message) || String(err))}</div>`;
+    }finally{
+      body.style.opacity = '';
+      btn.disabled = false;
+      usageBusy = false;
+    }
+  }
+
+  function renderUsage(r){
+    const cap = r.capacity, L = r.limits;
+    const resetDate = new Date(r.reset.monthEnd);
+    const bottleneckName = cap.bottleneck === 'r2' ? 'R2 原檔空間' : 'Firebase 縮圖空間';
+    const avg = cap.bottleneck === 'r2' ? cap.avgOrigBytes : cap.avgThumbBytes;
+
+    // 空間明細。「已刪除保留中」單獨一列——Google 預設保留 7 天，那段期間照算錢，
+    // 只看檔案列表會少算，這一列就是在解釋總數為什麼比明細加起來多
+    const parts = (r.firebase.breakdown || [])
+      .map(b=> `<div><span>${escapeHtml(b.label)}　${b.n} 個</span><span>${fmtBytes(b.bytes)}</span></div>`)
+      .join('') +
+      (r.firebase.hiddenBytes > 0
+        ? `<div class="soft"><span>已刪除・保留中（7 天後自動消失）</span><span>${fmtBytes(r.firebase.hiddenBytes)}</span></div>`
+        : '');
+
+    const big = r.firebase.biggest;
+    document.getElementById('usageBody').innerHTML = `
+      <div class="usage-hero">
+        <div class="lbl">照這個平均大小，地盤還塞得下</div>
+        <div class="big">${cap.left == null ? '—' : cap.left.toLocaleString('en-US')}<small>張</small></div>
+        <div class="why">${cap.left == null
+          ? '還沒有貨可以推算平均大小'
+          : `先滿的是<b>${bottleneckName}</b>（一張平均 ${fmtBytes(avg)}）<br>
+             R2 可放 ${cap.r2Left == null ? '—' : cap.r2Left.toLocaleString('en-US')} 張・Firebase 可放 ${cap.firebaseLeft == null ? '—' : cap.firebaseLeft.toLocaleString('en-US')} 張`}</div>
+      </div>
+
+      <div class="usage-sec">CLOUDFLARE R2 ・ 照片原檔</div>
+      ${meterRow('空間', r.r2.bytes, L.r2Storage, fmtBytes)}
+      <div class="usage-parts">
+        <div><span>檔案數</span><span>${r.r2.objects.toLocaleString('en-US')} 個・最大 ${fmtBytes(r.r2.biggest)}</span></div>
+        <div><span>下載流量</span><span class="usage-free">♾️ 無上限免費</span></div>
+      </div>
+      ${meterRow('寫入次數（本月）', r.r2.classA, L.r2ClassA, fmtCount)}
+
+      <div class="usage-sec">FIREBASE ・ 縮圖與網站檔案</div>
+      ${meterRow('空間', r.firebase.bytes, L.fbStorage, fmtBytes)}
+      <div class="usage-parts">${parts}</div>
+      ${meterRow('下載流量（本月）', r.firebase.egress, L.fbEgress, fmtBytes)}
+      ${meterRow('讀取次數（本月）', r.firebase.classB, L.fbClassB, fmtCount)}
+      ${meterRow('寫入次數（本月）', r.firebase.classA, L.fbClassA, fmtCount)}
+
+      <div class="usage-sec">FIRESTORE ・ 資料庫（額度每天重置）</div>
+      ${meterRow('資料量', r.firestore.bytes, L.fsStorage, fmtBytes)}
+      ${meterRow('今日讀取', r.firestore.reads, L.fsReads, fmtCount)}
+      ${meterRow('今日寫入', r.firestore.writes, L.fsWrites, fmtCount)}
+
+      <div class="usage-sec">這個月要付的帳</div>
+      ${renderBill(r)}
+
+      <div class="usage-note">
+        <b>月額度</b>在 ${resetDate.getMonth() + 1}/${resetDate.getDate()} 歸零（還有 ${r.reset.monthDaysLeft} 天）・<b>日額度</b>還有 ${r.reset.dayHoursLeft} 小時<br>
+        ${big ? `最壓秤的一張：${escapeHtml(big.name.split('/').pop())}（${fmtBytes(big.bytes)}）<br>` : ''}
+        R2 的次數只算我們自己發出的，不含訪客下載（訪客直連 Cloudflare，看不到）。
+        ${r.cached ? `這是 ${Math.round(r.ageSec / 60)} 分鐘前抄的帳，按上面的重新整理重算一遍。` : '剛剛重算過的帳。'}
+      </div>`;
+  }
+
+  // 費用明細。每一列只講三件事：哪個項目、超量多少、要付多少錢 ——
+  // 用量本身上面的進度條已經有了，這裡重複只會讓人看不懂重點。
+  function renderBill(r){
+    const cost = r.cost || {};
+    const items = cost.items || [];
+    const money = (usd)=> usd > 0 && usd < 0.01 ? '<$0.01' : '$' + usd.toFixed(2);
+    const amount = (n, unit)=>
+      (n >= 1000 ? Math.round(n).toLocaleString('en-US') : n >= 10 ? n.toFixed(1) : n.toFixed(2)) + ' ' + unit;
+
+    const rows = items.map(i=>{
+      // 已經在收錢 → 紅；還沒收但照這速度月底會超 → 橘（金額欄仍是「已產生」，所以會是 $0.00）
+      const cls = i.accruedUsd > 0 ? 'charged' : i.projectedUsd > 0 ? 'willcharge' : '';
+      const state = i.overNow > 0
+        ? `超了 ${amount(i.overNow, i.unitLabel)}`
+        : i.overProjected > 0
+          ? `月底恐怕會超 ${amount(i.overProjected, i.unitLabel)}`
+          : '還在免費額度裡';
+      return `<div class="${cls}">
+          <span>${escapeHtml(i.label)}</span><i>${state}</i><b>${money(i.accruedUsd)}</b>
+        </div>`;
+    }).join('');
+
+    const accrued = cost.accruedUsd || 0;
+    const projected = cost.projectedUsd || 0;
+    const rate = cost.usdToTwd || 32;
+    const resetDate = new Date(r.reset.monthEnd);
+    const twd = Math.round(projected * rate);
+
+    return `<div class="usage-bill">${rows}</div>
+      <div class="usage-total ${accrued > 0 ? 'charged' : ''}">
+        <div><span>已經產生的帳</span><b>US$${accrued.toFixed(2)}</b></div>
+        <div class="proj"><span>月底預估（${resetDate.getMonth() + 1}/${resetDate.getDate()} 結算）</span><b>US$${projected.toFixed(2)}</b></div>
+        <span class="twd">≈ NT$${twd.toLocaleString('en-US')}（匯率 1:${rate}）・本月已過 ${Math.round((cost.elapsed || 0) * 100)}%</span>
+      </div>`;
+  }
+
+  document.getElementById('usageRefresh').addEventListener('click', ()=> loadUsage(true));
+
+  // ---------- 圖片快取修復 ----------
+  function initFixCache(){
+    // 從下載網址反推 Storage 路徑（彩蛋檔案只存了網址）
+    function pathFromDownloadUrl(url){
+      try{
+        const m = (url || '').match(/\/o\/([^?]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
+      }catch(err){ return ''; }
+    }
+
+    document.getElementById('fixCacheBtn').onclick = async ()=>{
+      const btn = document.getElementById('fixCacheBtn');
+      const status = document.getElementById('fixCacheStatus');
+      btn.disabled = true;
+      status.style.display = 'block';
+      status.textContent = '清點庫存中…';
+
+      // 收集所有檔案路徑；原始檔要多補附件標頭
+      const paths = new Set();
+      const origPaths = new Set();
+      for(const colName of ['avatars', 'gallery', 'fursonas']){
+        const snap = await getDocs(collection(db, colName));
+        snap.forEach(d=>{
+          const data = d.data();
+          const p = data.storagePath || pathFromDownloadUrl(data.imageUrl);
+          if(p) paths.add(p);
+          const op = data.originalPath || '';
+          // R2 上的原檔跳過：標頭在上傳當下就寫在 R2 物件上了，
+          // 這裡的 updateMetadata 是 Firebase 的功能，碰不到別家服務
+          if(op && data.originalStore !== 'r2') origPaths.add(op);
+        });
+      }
+      const eggSnap = await getDoc(doc(db, 'settings', 'easterEgg'));
+      if(eggSnap.exists()){
+        const d = eggSnap.data();
+        [d.stage1AvatarUrl, d.stage1SoundUrl].forEach(u=>{
+          const p = pathFromDownloadUrl(u);
+          if(p) paths.add(p);
+        });
+      }
+
+      let done = 0, failed = 0;
+      const jobs = [
+        ...[...paths].map(p=> ({ p, meta: IMG_CACHE_META })),
+        ...[...origPaths].map(p=> ({ p, meta: {
+          ...IMG_CACHE_META,
+          contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(p.split('/').pop().replace(/^\d+_/, ''))}`
+        }}))
+      ];
+      for(const job of jobs){
+        try{
+          await updateMetadata(ref(storage, job.p), job.meta);
+          done++;
+        }catch(err){
+          failed++;
+          console.warn('補件沒過：', job.p, err);
+        }
+        status.textContent = `補件中… ${done + failed} / ${jobs.length}`;
+      }
+      status.textContent = failed
+        ? `收工：過了 ${done} 個，落了 ${failed} 個（細節看瀏覽器 console）`
+        : `收工！補好 ${done} 個檔案 ✓`;
+      btn.disabled = false;
+    };
+
+    // 手動把還留在 Firebase 的原始檔搬去 R2。
+    // 一次搬 5 張、搬完一批接著下一批，直到全部搬完；中斷了再按一次就會續搬。
+    document.getElementById('migrateBtn').onclick = async ()=>{
+      const ok = await uiConfirm('每張先複製、核對過了才刪 Firebase 那份，中途停下不會掉東西。',
+        { title: '開始把原檔搬去 R2？', okLabel: '開始搬' });
+      if(!ok) return;
+      const btn = document.getElementById('migrateBtn');
+      const status = document.getElementById('migrateStatus');
+      btn.disabled = true;
+      status.style.display = 'block';
+      let movedTotal = 0;
+      try{
+        while(true){
+          status.textContent = `搬運中…（已搬 ${movedTotal} 張）`;
+          const r = (await migrateOriginalsNow({ limit: 5 })).data;
+          movedTotal += r.moved;
+          if(r.failed){
+            status.textContent = `搬了 ${movedTotal} 張之後卡住：${(r.errors || []).join('；') || '未知錯誤'}（可再按一次重試）`;
+            btn.disabled = false;
+            return;
+          }
+          if(r.remaining <= 0) break;
+          if(r.moved === 0){
+            // 沒有進展就先停，避免無限迴圈（理論上不會發生）
+            status.textContent = `已搬 ${movedTotal} 張，剩 ${r.remaining} 張沒動靜，先停（再按一次可續搬）`;
+            btn.disabled = false;
+            return;
+          }
+        }
+        status.textContent = movedTotal
+          ? `收工！${movedTotal} 張原檔全進 R2 了 ✓`
+          : '沒東西要搬（原檔早就都在 R2 上）✓';
+      }catch(err){
+        status.textContent = `搬到一半斷了：${(err && err.message) || err}（已搬 ${movedTotal} 張，再按一次可續搬）`;
+      }
+      btn.disabled = false;
+    };
+  }
+
+  // ---------- 地盤配色（類 Material You 三色推算） ----------
+  function hexToRgb(hex){
+    hex = (hex || '').replace('#','').trim();
+    if(hex.length === 3) hex = hex.split('').map(c=>c+c).join('');
+    const num = parseInt(hex, 16);
+    if(isNaN(num)) return {r:0,g:0,b:0};
+    return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+  }
+  function rgbToHex(r,g,b){
+    return '#' + [r,g,b].map(x=> Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join('');
+  }
+  function mixColor(c1, c2, t){
+    return { r:c1.r+(c2.r-c1.r)*t, g:c1.g+(c2.g-c1.g)*t, b:c1.b+(c2.b-c1.b)*t };
+  }
+  function luminance(c){
+    const a = [c.r,c.g,c.b].map(v=>{ v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); });
+    return 0.2126*a[0] + 0.7152*a[1] + 0.0722*a[2];
+  }
+  function rgba(c, a){ return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`; }
+
+  function deriveTheme(hex1, hex2, hex3, systemAware){
+    const c1 = hexToRgb(hex1), c2 = hexToRgb(hex2);
+    const c3Picked = hexToRgb(hex3);
+    const black = {r:0,g:0,b:0}, white = {r:255,g:255,b:255};
+    let isLight = luminance(c3Picked) > 0.5;
+    let c3 = c3Picked;
+    if(systemAware && window.matchMedia){
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      isLight = !systemDark;
+      c3 = systemDark ? mixColor(c3Picked, black, 0.82) : c3Picked;
+    }
+    const ink = isLight ? mixColor(c3, black, 0.82) : mixColor(c3, white, 0.9);
+    const muted = isLight ? mixColor(c3, black, 0.5) : mixColor(c3, white, 0.55);
+    const glassBase = isLight ? white : mixColor(c3, black, 0.4);
+    return {
+      isLight,
+      rust: hex1, moss: hex2, bgBase: rgbToHex(c3.r, c3.g, c3.b),
+      ink: rgbToHex(ink.r, ink.g, ink.b),
+      muted: rgbToHex(muted.r, muted.g, muted.b),
+      line: isLight ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.10)',
+      glass: rgba(glassBase, isLight ? 0.38 : 0.55),
+      glassStrong: rgba(glassBase, isLight ? 0.58 : 0.72),
+      chipBg: rgbToHex(ink.r, ink.g, ink.b),
+      chipText: isLight ? '#F6EEDF' : '#16120E',
+      scrim: isLight ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.5)',
+      radial1: rgba(c1, 0.55),
+      radial2: rgba(mixColor(c1,c2,0.5), 0.5),
+      radial3: rgba(c2, 0.55),
+      radial4: rgba(mixColor(c3Picked,c1,0.3), 0.4)
+    };
+  }
+
+  function renderThemePreview(hex1, hex2, hex3){
+    const t = deriveTheme(hex1, hex2, hex3);
+    const box = document.getElementById('themePreview');
+    box.style.background = t.bgBase;
+    box.innerHTML = `
+      <span class="tp-tag" style="background:${t.glassStrong}; color:${t.ink}; border:1px solid ${t.line};">🦊 Fox</span>
+      <span class="tp-tag" style="background:${t.glassStrong}; color:${t.ink}; border:1px solid ${t.line};">INFP</span>
+      <div style="color:${t.ink}; font-weight:800; font-size:15px; margin-top:10px;">Julian</div>
+      <div style="color:${t.muted}; font-size:12px; margin-top:2px;">先看看</div>
+      <div class="tp-btn" style="background:${t.chipBg}; color:${t.chipText};">按鈕長這樣</div>
+    `;
+  }
+
+  function applyThemeToAdmin(hex1, hex2, hex3){
+    const root = document.documentElement.style;
+    if(!hex1 || !hex2 || !hex3){
+      // 空值＝清掉覆寫
+      ['--rust','--moss','--bg-base','--ink','--muted','--line','--glass','--glass-strong',
+       '--bg-radial-1','--bg-radial-2','--bg-radial-3','--bg-radial-4'].forEach(p=> root.removeProperty(p));
+      try{ localStorage.removeItem('julian_theme_colors'); }catch(err){}
+      return;
+    }
+    const t = deriveTheme(hex1, hex2, hex3, true);
+    root.setProperty('--rust', t.rust);
+    root.setProperty('--moss', t.moss);
+    root.setProperty('--bg-base', t.bgBase);
+    root.setProperty('--ink', t.ink);
+    root.setProperty('--muted', t.muted);
+    root.setProperty('--line', t.line);
+    root.setProperty('--glass', t.glass);
+    root.setProperty('--glass-strong', t.glassStrong);
+    root.setProperty('--bg-radial-1', t.radial1);
+    root.setProperty('--bg-radial-2', t.radial2);
+    root.setProperty('--bg-radial-3', t.radial3);
+    root.setProperty('--bg-radial-4', t.radial4);
+    try{ localStorage.setItem('julian_theme_colors', JSON.stringify({color1:hex1, color2:hex2, color3:hex3})); }catch(err){}
+  }
+
+  if(window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+      try{
+        const cached = localStorage.getItem('julian_theme_colors');
+        if(!cached) return;
+        const t = JSON.parse(cached);
+        if(t.color1 && t.color2 && t.color3) applyThemeToAdmin(t.color1, t.color2, t.color3);
+      }catch(err){}
+    });
+  }
+
+  function initThemeColors(){
+    const ref3 = doc(db, 'settings', 'theme');
+    const p1 = document.getElementById('themeColor1Picker');
+    const h1 = document.getElementById('themeColor1Hex');
+    const p2 = document.getElementById('themeColor2Picker');
+    const h2 = document.getElementById('themeColor2Hex');
+    const p3 = document.getElementById('themeColor3Picker');
+    const h3 = document.getElementById('themeColor3Hex');
+
+    function syncAndPreview(){
+      h1.value = p1.value.toUpperCase();
+      h2.value = p2.value.toUpperCase();
+      h3.value = p3.value.toUpperCase();
+      renderThemePreview(p1.value, p2.value, p3.value);
+    }
+    function hexInputChange(picker, hexInput){
+      let v = hexInput.value.trim();
+      if(!v.startsWith('#')) v = '#' + v;
+      if(/^#[0-9A-Fa-f]{6}$/.test(v)){
+        picker.value = v;
+        renderThemePreview(p1.value, p2.value, p3.value);
+      }
+    }
+
+    [p1,p2,p3].forEach(p=> p.addEventListener('input', syncAndPreview));
+    h1.addEventListener('change', ()=> hexInputChange(p1, h1));
+    h2.addEventListener('change', ()=> hexInputChange(p2, h2));
+    h3.addEventListener('change', ()=> hexInputChange(p3, h3));
+
+    getDoc(ref3).then(snap=>{
+      if(snap.exists()){
+        const d = snap.data();
+        if(d.color1) p1.value = d.color1;
+        if(d.color2) p2.value = d.color2;
+        if(d.color3) p3.value = d.color3;
+        if(d.color1 && d.color2 && d.color3) applyThemeToAdmin(d.color1, d.color2, d.color3);
+      }
+      syncAndPreview();
+    });
+
+    document.getElementById('themeSaveBtn').onclick = async ()=>{
+      await setDoc(ref3, {
+        color1: p1.value, color2: p2.value, color3: p3.value,
+        updatedAt: serverTimestamp()
+      }, { merge:true });
+      applyThemeToAdmin(p1.value, p2.value, p3.value);
+      const status = document.getElementById('themeStatus');
+      status.classList.add('show');
+      setTimeout(()=> status.classList.remove('show'), 2000);
+    };
+
+    document.getElementById('themeResetBtn').onclick = async ()=>{
+      await setDoc(ref3, { color1:'', color2:'', color3:'', updatedAt: serverTimestamp() }, { merge:true });
+      p1.value = '#B85C34'; p2.value = '#6E7A52'; p3.value = '#EFE4D2';
+      syncAndPreview();
+      applyThemeToAdmin('', '', '');
+      const status = document.getElementById('themeStatus');
+      status.textContent = '打回原形了 ✓';
+      status.classList.add('show');
+      setTimeout(()=>{ status.classList.remove('show'); status.textContent = '收下了 ✓'; }, 2000);
+    };
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ── 分享連結 ──
+  // 前台認 ?photo= / ?album= / ?ref= 三種參數，值一律是 Firestore 文件 ID。
+  // 寫死站台網址而不是從 location 推：後台有時是本機開檔在看的，推出來會變成 file:// 的死連結。
+  const SHARE_BASE = 'https://julianrenard.com/';
+  const shareLink = (kind, id)=> `${SHARE_BASE}?${kind}=${encodeURIComponent(id)}`;
+
+  async function copyShareLink(kind, id, btn){
+    const url = shareLink(kind, id);
+    let ok = false;
+    try{
+      await navigator.clipboard.writeText(url);
+      ok = true;
+    }catch(err){
+      // 舊瀏覽器或非安全連線拿不到剪貼簿 API，退回老方法
+      try{
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.cssText = 'position:fixed; top:-1000px; opacity:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      }catch(e2){ ok = false; }
+    }
+    if(!btn) return ok;
+    const keep = btn.dataset.label || btn.textContent;
+    btn.dataset.label = keep;
+    // 方塊角落那幾顆只有一個圖示，塞「抄好了 ✓」會撐寬去壓到隔壁的 360／HDR
+    const roomy = keep.trim().length > 3;
+    btn.textContent = ok ? (roomy ? '抄好了 ✓' : '✓') : (roomy ? '抄不動' : '✕');
+    btn.classList.toggle(btn.classList.contains('btn') ? 'share-done' : 'done', ok);
+    clearTimeout(btn._shareTimer);
+    btn._shareTimer = setTimeout(()=>{
+      btn.textContent = keep;
+      btn.classList.remove('done', 'share-done');
+    }, 1600);
+    if(!ok) await uiAlert(`剪貼簿不給碰，自己抄一下：\n${url}`, '複製失敗');
+    return ok;
+  }
+
+  // 防止把檔案拖到上傳區以外的地方時，瀏覽器直接開啟該檔案（會離開後台頁面）
+  ['dragover','drop'].forEach(ev=>
+    window.addEventListener(ev, (e)=>{ e.preventDefault(); }, false)
+  );
+</script>
+</body>
+</html>
